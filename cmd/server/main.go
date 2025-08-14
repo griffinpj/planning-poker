@@ -75,6 +75,7 @@ func main() {
 		r.Delete("/{sessionID}", h.DeleteSession)
 		r.Post("/{sessionID}/review", h.ReviewSession)
 		r.Get("/{sessionID}/summary", h.GetSessionSummary)
+		r.Get("/{sessionID}/export-csv", h.ExportSessionCSV)
 	})
 
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("static/"))))

@@ -49,7 +49,7 @@
                         {{$isCurrentTicket := and $.Session.CurrentTicket (eq $ticket.ID $.Session.CurrentTicket.ID)}}
                         {{$hideAverage := and $.Session.IsVotingActive $isCurrentTicket}}
                         {{if and $ticketAvg (not $hideAverage)}}
-                        <div class="text-xs text-purple-600 font-medium">Avg: {{printf "%.1f" $ticketAvg}}</div>
+                        <div class="text-xs text-purple-600 font-medium">Median: {{printf "%.1f" $ticketAvg}}</div>
                         {{end}}
                         {{if and $.Session.CurrentTicket (eq $ticket.ID $.Session.CurrentTicket.ID)}}
                         <div class="text-xs text-blue-600 font-medium">Current ticket</div>
@@ -65,7 +65,7 @@
                         {{$isCurrentTicket := and $.Session.CurrentTicket (eq $ticket.ID $.Session.CurrentTicket.ID)}}
                         {{$hideAverage := and $.Session.IsVotingActive $isCurrentTicket}}
                         {{if and $ticketAvg (not $hideAverage)}}
-                        <div class="text-xs text-purple-600 font-medium">Avg: {{printf "%.1f" $ticketAvg}}</div>
+                        <div class="text-xs text-purple-600 font-medium">Median: {{printf "%.1f" $ticketAvg}}</div>
                         {{end}}
                         {{if and $.Session.CurrentTicket (eq $ticket.ID $.Session.CurrentTicket.ID)}}
                         <div class="text-xs text-blue-600 font-medium">Current ticket</div>

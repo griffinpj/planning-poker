@@ -24,20 +24,42 @@
         </div>
 
         <!-- Summary Statistics -->
-        <div class="grid md:grid-cols-3 gap-6 mb-6">
-            <div class="bg-white rounded-lg shadow-md p-6 text-center">
-                <div class="text-3xl font-bold text-blue-600 mb-2">{{.TotalVotes}}</div>
-                <div class="text-gray-600">Total Votes Cast</div>
+        <div class="grid lg:grid-cols-5 md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow-md p-4 text-center">
+                <div class="text-2xl font-bold text-blue-600 mb-2">{{.TotalVotes}}</div>
+                <div class="text-gray-600 text-sm">Total Votes</div>
             </div>
-            <div class="bg-white rounded-lg shadow-md p-6 text-center">
-                <div class="text-3xl font-bold text-green-600 mb-2">{{.EstimatedTickets}}</div>
-                <div class="text-gray-600">Tickets Estimated</div>
+            <div class="bg-white rounded-lg shadow-md p-4 text-center">
+                <div class="text-2xl font-bold text-green-600 mb-2">{{.EstimatedTickets}}</div>
+                <div class="text-gray-600 text-sm">Tickets Estimated</div>
             </div>
-            <div class="bg-white rounded-lg shadow-md p-6 text-center">
-                <div class="text-3xl font-bold text-purple-600 copyable-value mb-2" 
-                     onclick="copyAverageValue(event, '{{printf "%.1f" .OverallAverage}}')"
-                     title="Click to copy overall average">{{printf "%.1f" .OverallAverage}}</div>
-                <div class="text-gray-600">Overall Average (click to copy)</div>
+            <div class="bg-white rounded-lg shadow-md p-4 text-center">
+                {{if .OverallStats.HasValues}}
+                <div class="text-2xl font-bold text-purple-600 copyable-value mb-2" 
+                     onclick="copyAverageValue(event, '{{printf "%.1f" .OverallStats.Median}}')"
+                     title="Click to copy overall median">{{printf "%.1f" .OverallStats.Median}}</div>
+                <div class="text-gray-600 text-sm">Overall Median</div>
+                {{else}}
+                <div class="text-2xl font-bold text-gray-400 mb-2">N/A</div>
+                <div class="text-gray-600 text-sm">Overall Median</div>
+                {{end}}
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-4 text-center">
+                {{if .OverallStats.HasValues}}
+                <div class="text-2xl font-bold text-blue-600 copyable-value mb-2" 
+                     onclick="copyAverageValue(event, '{{printf "%.1f" .OverallStats.Mean}}')"
+                     title="Click to copy overall mean">{{printf "%.1f" .OverallStats.Mean}}</div>
+                <div class="text-gray-600 text-sm">Overall Mean</div>
+                {{else}}
+                <div class="text-2xl font-bold text-gray-400 mb-2">N/A</div>
+                <div class="text-gray-600 text-sm">Overall Mean</div>
+                {{end}}
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-4 text-center">
+                <div class="text-xl font-bold text-green-600 copyable-value mb-2" 
+                     onclick="copyAverageValue(event, '{{.OverallStats.Mode}}')"
+                     title="Click to copy overall mode">{{.OverallStats.Mode}}</div>
+                <div class="text-gray-600 text-sm">Overall Mode</div>
             </div>
         </div>
 
@@ -58,15 +80,24 @@
                             {{end}}
                         </div>
                         <div class="ml-4 text-right">
-                            {{$ticketAvg := index $.TicketAverages .ID}}
+                            {{$ticketStats := index $.TicketStats .ID}}
                             {{if .FinalEstimate}}
                             <div class="text-2xl font-bold text-green-600">{{.FinalEstimate}}</div>
                             <div class="text-xs text-gray-500">Final Estimate</div>
-                            {{else if $ticketAvg}}
-                            <div class="text-2xl font-bold text-purple-600 copyable-value" 
-                                 onclick="copyAverageValue(event, '{{printf "%.1f" $ticketAvg}}')"
-                                 title="Click to copy average value">{{printf "%.1f" $ticketAvg}}</div>
-                            <div class="text-xs text-gray-500">Average Vote (click to copy)</div>
+                            {{else if $ticketStats}}
+                            <div class="space-y-1">
+                                {{if $ticketStats.HasValues}}
+                                <div class="text-lg font-bold text-purple-600 copyable-value" 
+                                     onclick="copyAverageValue(event, '{{printf "%.1f" $ticketStats.Median}}')"
+                                     title="Click to copy median value">Median: {{printf "%.1f" $ticketStats.Median}}</div>
+                                <div class="text-sm font-semibold text-blue-600 copyable-value" 
+                                     onclick="copyAverageValue(event, '{{printf "%.1f" $ticketStats.Mean}}')"
+                                     title="Click to copy mean value">Mean: {{printf "%.1f" $ticketStats.Mean}}</div>
+                                {{end}}
+                                <div class="text-sm font-semibold text-green-600 copyable-value" 
+                                     onclick="copyAverageValue(event, '{{$ticketStats.Mode}}')"
+                                     title="Click to copy mode value">Mode: {{$ticketStats.Mode}}</div>
+                            </div>
                             {{else}}
                             <div class="text-gray-400">No votes</div>
                             {{end}}
@@ -102,14 +133,31 @@
                             {{end}}
                         </div>
                         
-                        <!-- Average for this ticket -->
-                        {{$ticketAvg := index $.TicketAverages .ID}}
-                        {{if $ticketAvg}}
-                        <div class="mt-2 text-sm">
-                            <span class="font-medium text-gray-700">Average: </span>
-                            <span class="font-bold text-purple-600 copyable-value" 
-                                  onclick="copyAverageValue(event, '{{printf "%.1f" $ticketAvg}}')"
-                                  title="Click to copy average value">{{printf "%.1f" $ticketAvg}}</span>
+                        <!-- Statistics for this ticket -->
+                        {{$ticketStats := index $.TicketStats .ID}}
+                        {{if $ticketStats}}
+                        <div class="mt-3 p-2 bg-gray-50 rounded text-sm space-y-1">
+                            <div class="font-medium text-gray-700 mb-2">Statistical Summary:</div>
+                            {{if $ticketStats.HasValues}}
+                            <div>
+                                <span class="font-medium text-gray-600">Median: </span>
+                                <span class="font-bold text-purple-600 copyable-value" 
+                                      onclick="copyAverageValue(event, '{{printf "%.1f" $ticketStats.Median}}')"
+                                      title="Click to copy median value">{{printf "%.1f" $ticketStats.Median}}</span>
+                            </div>
+                            <div>
+                                <span class="font-medium text-gray-600">Mean: </span>
+                                <span class="font-bold text-blue-600 copyable-value" 
+                                      onclick="copyAverageValue(event, '{{printf "%.1f" $ticketStats.Mean}}')"
+                                      title="Click to copy mean value">{{printf "%.1f" $ticketStats.Mean}}</span>
+                            </div>
+                            {{end}}
+                            <div>
+                                <span class="font-medium text-gray-600">Mode: </span>
+                                <span class="font-bold text-green-600 copyable-value" 
+                                      onclick="copyAverageValue(event, '{{$ticketStats.Mode}}')"
+                                      title="Click to copy mode value">{{$ticketStats.Mode}}</span>
+                            </div>
                         </div>
                         {{end}}
                     </div>
@@ -153,13 +201,13 @@
                             <div class="font-bold text-green-600">
                                 {{if and $participantStats (gt $participantStats.VoteCount 0)}}
                                 <span class="copyable-value" 
-                                      onclick="copyAverageValue(event, '{{printf "%.1f" $participantStats.AverageVote}}')"
-                                      title="Click to copy participant average">{{printf "%.1f" $participantStats.AverageVote}}</span>
+                                      onclick="copyAverageValue(event, '{{printf "%.1f" $participantStats.MedianVote}}')"
+                                      title="Click to copy participant median">{{printf "%.1f" $participantStats.MedianVote}}</span>
                                 {{else}}
                                 -
                                 {{end}}
                             </div>
-                            <div class="text-gray-600 text-xs">Avg Vote{{if and $participantStats (gt $participantStats.VoteCount 0)}} (click to copy){{end}}</div>
+                            <div class="text-gray-600 text-xs">Median Vote{{if and $participantStats (gt $participantStats.VoteCount 0)}} (click to copy){{end}}</div>
                         </div>
                     </div>
                 </div>
@@ -174,9 +222,9 @@
                     <span class="material-icons text-sm mr-2">home</span>
                     New Session
                 </a>
-                <button onclick="window.print()" class="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 inline-flex items-center">
-                    <span class="material-icons text-sm mr-2">print</span>
-                    Print Summary
+                <button onclick="exportSummaryCSV()" class="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 inline-flex items-center">
+                    <span class="material-icons text-sm mr-2">download</span>
+                    Export Summary
                 </button>
             </div>
             <div class="mt-4 text-sm text-gray-500">
@@ -233,6 +281,12 @@ function copyAverageValue(event, value) {
         console.error('Failed to copy value: ', err);
         alert('Failed to copy value. Value: ' + value);
     });
+}
+
+function exportSummaryCSV() {
+    const sessionId = '{{.Session.ID}}';
+    // Simply redirect to the CSV export endpoint
+    window.open(`/session/${sessionId}/export-csv`, '_blank');
 }
 </script>
 {{end}}

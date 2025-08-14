@@ -1,8 +1,12 @@
 package handlers
 
 import (
+	"encoding/csv"
+	"fmt"
 	"html/template"
 	"net/http"
+	"sort"
+	"time"
 
 	"poker-planning/internal/models"
 	"poker-planning/internal/services"
@@ -43,18 +47,27 @@ type PageData struct {
 	UserVote        *models.Vote
 	VoteHistogram   []VoteCount
 	CurrentTicketIndex int
-	TicketAverages  map[int]float64 // ticket ID -> average
+	TicketAverages  map[int]float64 // ticket ID -> median (backward compatibility)
 	// Summary page data
 	TotalVotes       int
 	EstimatedTickets int
-	OverallAverage   float64
+	OverallAverage   float64 // overall median (backward compatibility)
+	OverallStats     TicketStats // overall median, mean, mode
 	TicketVoteGroups map[int][]VoteCount // ticket ID -> vote groups
 	ParticipantStats map[string]*ParticipantStat // user ID -> stats
+	TicketStats      map[int]TicketStats // ticket ID -> full statistics
 }
 
 type ParticipantStat struct {
-	VoteCount   int
-	AverageVote float64
+	VoteCount  int
+	MedianVote float64
+}
+
+type TicketStats struct {
+	Median    float64
+	Mean      float64
+	Mode      string
+	HasValues bool // indicates if there are numeric votes
 }
 
 type VoteCount struct {
@@ -175,12 +188,12 @@ func (h *Handler) GetSessionPartial(w http.ResponseWriter, r *http.Request) {
 	var voteHistogram []VoteCount
 	var currentTicketIndex int
 	
-	// Calculate averages for all tickets
+	// Calculate medians for all tickets
 	ticketAverages := make(map[int]float64)
 	for _, ticket := range session.Tickets {
 		if len(ticket.Votes) > 0 {
-			if avg := h.calculateVoteAverage(ticket.Votes); avg != nil {
-				ticketAverages[ticket.ID] = *avg
+			if median := h.calculateVoteMedian(ticket.Votes); median != nil {
+				ticketAverages[ticket.ID] = *median
 			}
 		}
 	}
@@ -266,12 +279,12 @@ func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
 	var voteHistogram []VoteCount
 	var currentTicketIndex int
 	
-	// Calculate averages for all tickets
+	// Calculate medians for all tickets
 	ticketAverages := make(map[int]float64)
 	for _, ticket := range session.Tickets {
 		if len(ticket.Votes) > 0 {
-			if avg := h.calculateVoteAverage(ticket.Votes); avg != nil {
-				ticketAverages[ticket.ID] = *avg
+			if median := h.calculateVoteMedian(ticket.Votes); median != nil {
+				ticketAverages[ticket.ID] = *median
 			}
 		}
 	}
@@ -430,32 +443,119 @@ func (h *Handler) calculateVoteHistogram(votes []models.Vote) []VoteCount {
 	return histogram
 }
 
-func (h *Handler) calculateVoteAverage(votes []models.Vote) *float64 {
+func (h *Handler) calculateVoteMedian(votes []models.Vote) *float64 {
 	if len(votes) == 0 {
 		return nil
 	}
 	
-	var sum float64
-	var count int
+	var numericVotes []float64
 	
 	for _, vote := range votes {
-		// Only include numeric votes in average calculation
+		// Only include numeric votes in median calculation
 		// Skip special cards like ☕ and ?
 		switch vote.VoteValue {
 		case "0", "1", "2", "3", "5", "8", "13", "21", "34", "55", "89", "144":
 			if val := parseVoteValue(vote.VoteValue); val >= 0 {
-				sum += float64(val)
-				count++
+				numericVotes = append(numericVotes, float64(val))
 			}
 		}
 	}
 	
-	if count == 0 {
+	if len(numericVotes) == 0 {
 		return nil
 	}
 	
-	average := sum / float64(count)
-	return &average
+	// Sort the votes to calculate median
+	sort.Float64s(numericVotes)
+	
+	var median float64
+	n := len(numericVotes)
+	
+	if n%2 == 0 {
+		// Even number of votes: take the left middle value (lower index)
+		median = numericVotes[n/2-1]
+	} else {
+		// Odd number of votes: middle value
+		median = numericVotes[n/2]
+	}
+	
+	return &median
+}
+
+func (h *Handler) calculateTicketStats(votes []models.Vote) TicketStats {
+	if len(votes) == 0 {
+		return TicketStats{
+			Median:    0,
+			Mean:      0,
+			Mode:      "N/A",
+			HasValues: false,
+		}
+	}
+
+	// Separate numeric and non-numeric votes
+	var numericVotes []float64
+	voteFrequency := make(map[string]int)
+	
+	for _, vote := range votes {
+		voteFrequency[vote.VoteValue]++
+		
+		// Check if vote is numeric for median/mean calculation
+		switch vote.VoteValue {
+		case "0", "1", "2", "3", "5", "8", "13", "21", "34", "55", "89", "144":
+			if val := parseVoteValue(vote.VoteValue); val >= 0 {
+				numericVotes = append(numericVotes, float64(val))
+			}
+		}
+	}
+
+	stats := TicketStats{HasValues: len(numericVotes) > 0}
+
+	// Calculate median (only for numeric votes)
+	if len(numericVotes) > 0 {
+		sort.Float64s(numericVotes)
+		n := len(numericVotes)
+		if n%2 == 0 {
+			// Even number: take the left middle value (lower index)
+			stats.Median = numericVotes[n/2-1]
+		} else {
+			// Odd number: take the middle value
+			stats.Median = numericVotes[n/2]
+		}
+	}
+
+	// Calculate mean (only for numeric votes)
+	if len(numericVotes) > 0 {
+		var sum float64
+		for _, vote := range numericVotes {
+			sum += vote
+		}
+		stats.Mean = sum / float64(len(numericVotes))
+	}
+
+	// Calculate mode (for all votes, including non-numeric)
+	maxCount := 0
+	var modes []string
+	
+	for value, count := range voteFrequency {
+		if count > maxCount {
+			maxCount = count
+			modes = []string{value}
+		} else if count == maxCount {
+			modes = append(modes, value)
+		}
+	}
+	
+	if len(modes) == 1 {
+		stats.Mode = modes[0]
+	} else if len(modes) == len(voteFrequency) {
+		// All values appear equally - no mode
+		stats.Mode = "None"
+	} else {
+		// Multiple modes
+		stats.Mode = fmt.Sprintf("Multiple: %v", modes)
+	}
+
+	return stats
 }
 
 func parseVoteValue(voteValue string) int {
@@ -564,14 +664,20 @@ func (h *Handler) GetSessionSummary(w http.ResponseWriter, r *http.Request) {
 	var allVotes []models.Vote
 	ticketAverages := make(map[int]float64)
 	ticketVoteGroups := make(map[int][]VoteCount)
+	ticketStats := make(map[int]TicketStats)
 
 	for _, ticket := range session.Tickets {
 		if len(ticket.Votes) > 0 {
 			totalVotes += len(ticket.Votes)
 			allVotes = append(allVotes, ticket.Votes...)
 			
-			if avg := h.calculateVoteAverage(ticket.Votes); avg != nil {
-				ticketAverages[ticket.ID] = *avg
+			// Calculate full statistics
+			stats := h.calculateTicketStats(ticket.Votes)
+			ticketStats[ticket.ID] = stats
+			
+			// Maintain backward compatibility with median as "average"
+			if stats.HasValues {
+				ticketAverages[ticket.ID] = stats.Median
 				estimatedTickets++
 			}
 			
@@ -579,10 +685,14 @@ func (h *Handler) GetSessionSummary(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Calculate overall average
+	// Calculate overall statistics
 	var overallAverage float64
-	if overallAvg := h.calculateVoteAverage(allVotes); overallAvg != nil {
-		overallAverage = *overallAvg
+	var overallStats TicketStats
+	if len(allVotes) > 0 {
+		overallStats = h.calculateTicketStats(allVotes)
+		if overallStats.HasValues {
+			overallAverage = overallStats.Median
+		}
 	}
 
 	// Calculate participant statistics
@@ -601,8 +711,8 @@ func (h *Handler) GetSessionSummary(w http.ResponseWriter, r *http.Request) {
 			VoteCount: len(participantVotes),
 		}
 		
-		if avg := h.calculateVoteAverage(participantVotes); avg != nil {
-			stat.AverageVote = *avg
+		if median := h.calculateVoteMedian(participantVotes); median != nil {
+			stat.MedianVote = *median
 		}
 		
 		participantStats[participant.ID] = stat
@@ -620,9 +730,123 @@ func (h *Handler) GetSessionSummary(w http.ResponseWriter, r *http.Request) {
 		OverallAverage:   overallAverage,
 		TicketVoteGroups: ticketVoteGroups,
 		ParticipantStats: participantStats,
+		TicketStats:      ticketStats,
+		OverallStats:     overallStats,
 	}
 
 	h.executeTemplate(w, "base.html", data)
+}
+
+func (h *Handler) ExportSessionCSV(w http.ResponseWriter, r *http.Request) {
+	user := GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	sessionID := chi.URLParam(r, "sessionID")
+	session, err := h.sessionService.GetSessionByID(sessionID)
+	if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+	if session == nil {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if user was a participant
+	isParticipant := false
+	for _, participant := range session.Participants {
+		if participant.ID == user.ID {
+			isParticipant = true
+			break
+		}
+	}
+
+	if !isParticipant {
+		http.Error(w, "Not a session participant", http.StatusForbidden)
+		return
+	}
+
+	// Calculate statistics for CSV
+	ticketStats := make(map[int]TicketStats)
+	for _, ticket := range session.Tickets {
+		if len(ticket.Votes) > 0 {
+			stats := h.calculateTicketStats(ticket.Votes)
+			ticketStats[ticket.ID] = stats
+		}
+	}
+
+	// Set CSV headers
+	filename := fmt.Sprintf("planning-poker-%s-%s.csv", sessionID, time.Now().Format("2006-01-02"))
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+
+	// Create CSV writer
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	// Write header
+	header := []string{"Session Name", "Session ID", "Ticket Title", "Ticket Description", "Participant", "Vote Value", "Ticket Median", "Ticket Mean", "Ticket Mode"}
+	if err := writer.Write(header); err != nil {
+		http.Error(w, "Failed to write CSV header", http.StatusInternalServerError)
+		return
+	}
+
+	// Write data
+	for _, ticket := range session.Tickets {
+		stats := ticketStats[ticket.ID]
+		
+		if len(ticket.Votes) > 0 {
+			for _, vote := range ticket.Votes {
+				username := "Unknown"
+				if vote.User != nil {
+					username = vote.User.Username
+				}
+				
+				record := []string{
+					session.Name,
+					session.ID,
+					ticket.Title,
+					ticket.Description,
+					username,
+					vote.VoteValue,
+					formatFloat(stats.Median, stats.HasValues),
+					formatFloat(stats.Mean, stats.HasValues),
+					stats.Mode,
+				}
+				if err := writer.Write(record); err != nil {
+					http.Error(w, "Failed to write CSV record", http.StatusInternalServerError)
+					return
+				}
+			}
+		} else {
+			// Ticket with no votes
+			record := []string{
+				session.Name,
+				session.ID,
+				ticket.Title,
+				ticket.Description,
+				"",
+				"",
+				"N/A",
+				"N/A",
+				"N/A",
+			}
+			if err := writer.Write(record); err != nil {
+				http.Error(w, "Failed to write CSV record", http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+}
+
+func formatFloat(val float64, hasValues bool) string {
+	if !hasValues {
+		return "N/A"
+	}
+	return fmt.Sprintf("%.1f", val)
 }
 
 func (h *Handler) executeTemplate(w http.ResponseWriter, tmplName string, data interface{}) {
