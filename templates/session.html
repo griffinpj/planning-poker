@@ -295,10 +295,25 @@ window.sessionId = window.sessionId || {{.Session.ID}};
 
 function showAddTicketModal() {
     const modal = document.getElementById('add-ticket-modal');
-    const titleInput = document.getElementById('ticket-title');
     
-    if (modal) modal.classList.remove('hidden');
-    if (titleInput) titleInput.focus();
+    if (modal) {
+        modal.classList.remove('hidden');
+        
+        // Clear form inputs
+        const titleInput = document.getElementById('ticket-title');
+        const descriptionInput = document.getElementById('ticket-description');
+        
+        if (titleInput) {
+            titleInput.value = '';
+            titleInput.focus();
+        }
+        if (descriptionInput) {
+            descriptionInput.value = '';
+        }
+        
+        // Clear any validation errors
+        clearValidationErrors();
+    }
 }
 
 function hideAddTicketModal() {

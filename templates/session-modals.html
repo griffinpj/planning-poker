@@ -4,7 +4,7 @@
     <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
         <h3 class="text-xl font-bold mb-4">Add New Ticket</h3>
         
-        <form hx-post="/session/{{.Session.ID}}/tickets" hx-on::before-request="if(!validateTicketForm()) event.preventDefault()" hx-on::after-request="if(event.detail.successful) { hideAddTicketModal(); } else if(event.detail.xhr.status >= 400) { handleFormError(event.detail.xhr.responseText); }" novalidate>
+        <form hx-post="/session/{{.Session.ID}}/tickets" hx-swap="none" hx-on::before-request="if(!validateTicketForm()) event.preventDefault()" hx-on::after-request="if(event.detail.successful) { hideAddTicketModal(); } else if(event.detail.xhr.status >= 400) { handleFormError(event.detail.xhr.responseText); }" novalidate>
             <div class="mb-4">
                 <label for="ticket-title" class="block text-sm font-medium text-gray-700 mb-2">Title</label>
                 <input 

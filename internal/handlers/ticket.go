@@ -59,8 +59,8 @@ func (h *Handler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 
 	// Return success response for HTMX, redirect for regular requests
 	if r.Header.Get("HX-Request") != "" {
+		// Return success status - form uses hx-swap="none" so no content swapping occurs
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Ticket created successfully"))
 	} else {
 		http.Redirect(w, r, "/session/"+sessionID, http.StatusSeeOther)
 	}
