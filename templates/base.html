@@ -182,13 +182,9 @@
                             swap: 'outerHTML'
                         }).then(function() {
                             if (isOwnVote) {
-                                // For own votes, restore card highlighting from stored value
-                                console.log('Restoring own vote highlighting');
-                                if (typeof restoreCardHighlighting === 'function' && window.currentUserVote) {
-                                    setTimeout(() => {
-                                        restoreCardHighlighting(window.currentUserVote);
-                                    }, 100);
-                                }
+                                // Template should automatically show correct highlighting
+                                // No need for JavaScript restoration
+                                console.log('Template will handle card highlighting automatically');
                             }
                             
                             // Always restore participant vote display after refresh

@@ -45,7 +45,7 @@
                         {{if $ticket.FinalEstimate}}
                         <div class="text-xs text-green-600 font-medium">Estimated: {{$ticket.FinalEstimate}}</div>
                         {{end}}
-                        {{if index $.TicketAverages $ticket.ID}}
+                        {{if and (index $.TicketAverages $ticket.ID) (not $.Session.IsVotingActive)}}
                         <div class="text-xs text-purple-600 font-medium">Avg: {{printf "%.1f" (index $.TicketAverages $ticket.ID)}}</div>
                         {{end}}
                         {{if and $.Session.CurrentTicket (eq $ticket.ID $.Session.CurrentTicket.ID)}}
@@ -58,7 +58,7 @@
                         {{if $ticket.FinalEstimate}}
                         <div class="text-xs text-green-600 font-medium">Estimated: {{$ticket.FinalEstimate}}</div>
                         {{end}}
-                        {{if index $.TicketAverages $ticket.ID}}
+                        {{if and (index $.TicketAverages $ticket.ID) (not $.Session.IsVotingActive)}}
                         <div class="text-xs text-purple-600 font-medium">Avg: {{printf "%.1f" (index $.TicketAverages $ticket.ID)}}</div>
                         {{end}}
                         {{if and $.Session.CurrentTicket (eq $ticket.ID $.Session.CurrentTicket.ID)}}
@@ -623,18 +623,6 @@ function castVote(voteValue) {
     
     // Store the vote for later restoration
     window.currentUserVote = voteValue;
-    
-    // Show immediate visual feedback on the card
-    document.querySelectorAll('.voting-card').forEach(card => {
-        card.classList.remove('border-blue-500', 'bg-blue-50');
-        card.classList.add('border-gray-300');
-    });
-    
-    const selectedCard = document.querySelector(`[data-value="${voteValue}"]`);
-    if (selectedCard) {
-        selectedCard.classList.remove('border-gray-300');
-        selectedCard.classList.add('border-blue-500', 'bg-blue-50');
-    }
     
     // Send vote to server - WebSocket will handle all other updates
     fetch(`/session/{{.Session.ID}}/vote`, {
