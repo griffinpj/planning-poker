@@ -17,10 +17,17 @@ type DB struct {
 }
 
 func NewDB(dbPath string) (*DB, error) {
-	sqlDB, err := sql.Open("sqlite3", dbPath)
+	// Use SQLite connection string with performance optimizations
+	connectionString := fmt.Sprintf("%s?_journal_mode=WAL&_synchronous=NORMAL&_cache_size=1000&_foreign_keys=on", dbPath)
+	
+	sqlDB, err := sql.Open("sqlite3", connectionString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
+
+	// Set connection pool settings for better performance
+	sqlDB.SetMaxOpenConns(25)
+	sqlDB.SetMaxIdleConns(25)
 
 	if err := sqlDB.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)

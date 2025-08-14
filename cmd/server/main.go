@@ -19,7 +19,19 @@ import (
 )
 
 func main() {
-	db, err := database.NewDB("poker.db")
+	// Get port from environment variable or default to 8080
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	// Get database path from environment variable or default
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		dbPath = "poker.db"
+	}
+
+	db, err := database.NewDB(dbPath)
 	if err != nil {
 		log.Fatal("Failed to initialize database:", err)
 	}
@@ -40,6 +52,7 @@ func main() {
 	r.Use(middleware.Recoverer)
 	r.Use(utils.RecoverFromPanic)
 	r.Use(middleware.Compress(5))
+	r.Use(middleware.Timeout(30 * time.Second)) // Add timeout middleware
 	r.Use(handlers.SessionMiddleware(userService))
 
 	r.Get("/", h.Home)
@@ -65,12 +78,12 @@ func main() {
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("static/"))))
 
 	srv := &http.Server{
-		Addr:    ":8080",
+		Addr:    ":" + port,
 		Handler: r,
 	}
 
 	go func() {
-		log.Println("Server starting on :8080")
+		log.Printf("Server starting on :%s", port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal("Server failed to start:", err)
 		}

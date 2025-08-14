@@ -289,160 +289,35 @@
     </div>
 </div>
 
-<!-- Add Ticket Modal -->
-<div id="add-ticket-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-        <h3 class="text-xl font-bold mb-4">Add New Ticket</h3>
-        
-        <form hx-post="/session/{{.Session.ID}}/tickets" hx-on::before-request="if(!validateTicketForm()) event.preventDefault()" hx-on::after-request="if(event.detail.successful) { hideAddTicketModal(); } else if(event.detail.xhr.status >= 400) { handleFormError(event.detail.xhr.responseText); }" novalidate>
-            <div class="mb-4">
-                <label for="ticket-title" class="block text-sm font-medium text-gray-700 mb-2">Title</label>
-                <input 
-                    type="text" 
-                    id="ticket-title" 
-                    name="title" 
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-                    placeholder="Enter ticket title"
-                    required
-                    maxlength="200"
-                />
-            </div>
-            <div class="mb-6">
-                <label for="ticket-description" class="block text-sm font-medium text-gray-700 mb-2">Description (optional)</label>
-                <textarea 
-                    id="ticket-description" 
-                    name="description" 
-                    rows="3"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-                    placeholder="Enter ticket description"
-                    maxlength="1000"
-                ></textarea>
-            </div>
-            <div class="flex space-x-3">
-                <button 
-                    type="button" 
-                    onclick="hideAddTicketModal()"
-                    class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
-                >
-                    Cancel
-                </button>
-                <button 
-                    type="submit" 
-                    class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"
-                >
-                    Add Ticket
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- End Session Modal (Owner Only) -->
-<div id="end-session-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-        <h3 class="text-xl font-bold mb-4 text-red-600">End Session</h3>
-        <p class="text-gray-700 mb-6">Are you sure you want to end this session? This will remove all participants and cannot be undone.</p>
-        <div class="flex space-x-3">
-            <button 
-                type="button" 
-                onclick="hideEndSessionModal()"
-                class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
-            >
-                Cancel
-            </button>
-            <form class="flex-1" hx-delete="/session/{{.Session.ID}}" hx-on::after-request="window.location.href='/'">
-                <button 
-                    type="submit" 
-                    onclick="hideEndSessionModal()"
-                    class="w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700"
-                >
-                    End Session
-                </button>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Leave Session Modal (Participants) -->
-<div id="leave-session-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-        <h3 class="text-xl font-bold mb-4">Leave Session</h3>
-        <p class="text-gray-700 mb-6">Are you sure you want to leave this session?</p>
-        <div class="flex space-x-3">
-            <button 
-                type="button" 
-                onclick="hideLeaveSessionModal()"
-                class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
-            >
-                Cancel
-            </button>
-            <form class="flex-1" hx-post="/session/{{.Session.ID}}/leave" hx-on::after-request="window.location.href='/'">
-                <button 
-                    type="submit" 
-                    onclick="hideLeaveSessionModal()"
-                    class="w-full bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700"
-                >
-                    Leave Session
-                </button>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Edit Username Modal -->
-<div id="edit-username-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-        <h3 class="text-xl font-bold mb-4">Change Nickname</h3>
-        <form hx-post="/set-username" hx-on::after-request="if(event.detail.successful) { hideEditUsernameModal(); window.location.reload(); }" novalidate hx-on::before-request="if(!validateUsernameForm()) event.preventDefault()">
-            <input type="hidden" name="redirect_to" value="/session/{{.Session.ID}}">
-            <div class="mb-6">
-                <label for="new-username" class="block text-sm font-medium text-gray-700 mb-2">New Nickname</label>
-                <input 
-                    type="text" 
-                    id="new-username" 
-                    name="username" 
-                    value="{{.User.Username}}"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-                    placeholder="Enter your new nickname"
-                    maxlength="50"
-                />
-            </div>
-            <div class="flex space-x-3">
-                <button 
-                    type="button" 
-                    onclick="hideEditUsernameModal()"
-                    class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
-                >
-                    Cancel
-                </button>
-                <button 
-                    type="submit" 
-                    class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"
-                >
-                    Update Nickname
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
 <script>
+// Define session ID for JavaScript usage (avoid redeclaration)
+window.sessionId = window.sessionId || {{.Session.ID}};
+
 function showAddTicketModal() {
-    document.getElementById('add-ticket-modal').classList.remove('hidden');
-    document.getElementById('ticket-title').focus();
+    const modal = document.getElementById('add-ticket-modal');
+    const titleInput = document.getElementById('ticket-title');
+    
+    if (modal) modal.classList.remove('hidden');
+    if (titleInput) titleInput.focus();
 }
 
 function hideAddTicketModal() {
-    document.getElementById('add-ticket-modal').classList.add('hidden');
-    document.getElementById('ticket-title').value = '';
-    document.getElementById('ticket-description').value = '';
+    const modal = document.getElementById('add-ticket-modal');
+    const titleInput = document.getElementById('ticket-title');
+    const descriptionInput = document.getElementById('ticket-description');
+    
+    if (modal) modal.classList.add('hidden');
+    if (titleInput) titleInput.value = '';
+    if (descriptionInput) descriptionInput.value = '';
     // Clear any validation errors
     clearValidationErrors();
 }
 
 function clearValidationErrors() {
     const titleInput = document.getElementById('ticket-title');
-    titleInput.classList.remove('border-red-500');
+    if (titleInput) {
+        titleInput.classList.remove('border-red-500');
+    }
     const existingError = document.getElementById('title-error');
     if (existingError) {
         existingError.remove();
@@ -450,8 +325,15 @@ function clearValidationErrors() {
 }
 
 function validateTicketForm() {
-    const title = document.getElementById('ticket-title').value.trim();
     const titleInput = document.getElementById('ticket-title');
+    
+    // Check if elements exist (might be removed by WebSocket update)
+    if (!titleInput) {
+        console.log('Ticket form elements not found, validation skipped');
+        return false;
+    }
+    
+    const title = titleInput.value ? titleInput.value.trim() : '';
     
     // Clear previous validation
     clearValidationErrors();
@@ -463,7 +345,9 @@ function validateTicketForm() {
         errorDiv.id = 'title-error';
         errorDiv.className = 'text-red-500 text-sm mt-1';
         errorDiv.textContent = 'Title is required';
-        titleInput.parentNode.appendChild(errorDiv);
+        if (titleInput.parentNode) {
+            titleInput.parentNode.appendChild(errorDiv);
+        }
         titleInput.focus();
         return false;
     }
@@ -474,7 +358,9 @@ function validateTicketForm() {
         errorDiv.id = 'title-error';
         errorDiv.className = 'text-red-500 text-sm mt-1';
         errorDiv.textContent = 'Title must be no more than 200 characters';
-        titleInput.parentNode.appendChild(errorDiv);
+        if (titleInput.parentNode) {
+            titleInput.parentNode.appendChild(errorDiv);
+        }
         titleInput.focus();
         return false;
     }
@@ -485,44 +371,58 @@ function validateTicketForm() {
 function handleFormError(errorMessage) {
     // Show server validation error
     const titleInput = document.getElementById('ticket-title');
-    titleInput.classList.add('border-red-500');
-    const errorDiv = document.createElement('div');
-    errorDiv.id = 'title-error';
-    errorDiv.className = 'text-red-500 text-sm mt-1';
-    errorDiv.textContent = errorMessage || 'An error occurred while creating the ticket';
-    titleInput.parentNode.appendChild(errorDiv);
+    if (titleInput) {
+        titleInput.classList.add('border-red-500');
+        const errorDiv = document.createElement('div');
+        errorDiv.id = 'title-error';
+        errorDiv.className = 'text-red-500 text-sm mt-1';
+        errorDiv.textContent = errorMessage || 'An error occurred while creating the ticket';
+        if (titleInput.parentNode) {
+            titleInput.parentNode.appendChild(errorDiv);
+        }
+    }
 }
 
 function showEndSessionModal() {
-    document.getElementById('end-session-modal').classList.remove('hidden');
+    const modal = document.getElementById('end-session-modal');
+    if (modal) modal.classList.remove('hidden');
 }
 
 function hideEndSessionModal() {
-    document.getElementById('end-session-modal').classList.add('hidden');
+    const modal = document.getElementById('end-session-modal');
+    if (modal) modal.classList.add('hidden');
 }
 
 function showLeaveSessionModal() {
-    document.getElementById('leave-session-modal').classList.remove('hidden');
+    const modal = document.getElementById('leave-session-modal');
+    if (modal) modal.classList.remove('hidden');
 }
 
 function hideLeaveSessionModal() {
-    document.getElementById('leave-session-modal').classList.add('hidden');
+    const modal = document.getElementById('leave-session-modal');
+    if (modal) modal.classList.add('hidden');
 }
 
 function showEditUsernameModal() {
-    document.getElementById('edit-username-modal').classList.remove('hidden');
-    document.getElementById('new-username').select();
+    const modal = document.getElementById('edit-username-modal');
+    const usernameInput = document.getElementById('new-username');
+    
+    if (modal) modal.classList.remove('hidden');
+    if (usernameInput) usernameInput.select();
 }
 
 function hideEditUsernameModal() {
-    document.getElementById('edit-username-modal').classList.add('hidden');
+    const modal = document.getElementById('edit-username-modal');
+    if (modal) modal.classList.add('hidden');
     // Clear any validation errors
     clearUsernameValidationErrors();
 }
 
 function clearUsernameValidationErrors() {
     const usernameInput = document.getElementById('new-username');
-    usernameInput.classList.remove('border-red-500');
+    if (usernameInput) {
+        usernameInput.classList.remove('border-red-500');
+    }
     const existingError = document.getElementById('username-error');
     if (existingError) {
         existingError.remove();
@@ -530,8 +430,15 @@ function clearUsernameValidationErrors() {
 }
 
 function validateUsernameForm() {
-    const username = document.getElementById('new-username').value.trim();
     const usernameInput = document.getElementById('new-username');
+    
+    // Check if elements exist (might be removed by WebSocket update)
+    if (!usernameInput) {
+        console.log('Username form elements not found, validation skipped');
+        return false;
+    }
+    
+    const username = usernameInput.value ? usernameInput.value.trim() : '';
     
     // Clear previous validation
     clearUsernameValidationErrors();
@@ -543,7 +450,9 @@ function validateUsernameForm() {
         errorDiv.id = 'username-error';
         errorDiv.className = 'text-red-500 text-sm mt-1';
         errorDiv.textContent = 'Username is required';
-        usernameInput.parentNode.appendChild(errorDiv);
+        if (usernameInput.parentNode) {
+            usernameInput.parentNode.appendChild(errorDiv);
+        }
         usernameInput.focus();
         return false;
     }
@@ -554,7 +463,9 @@ function validateUsernameForm() {
         errorDiv.id = 'username-error';
         errorDiv.className = 'text-red-500 text-sm mt-1';
         errorDiv.textContent = 'Username must be no more than 50 characters';
-        usernameInput.parentNode.appendChild(errorDiv);
+        if (usernameInput.parentNode) {
+            usernameInput.parentNode.appendChild(errorDiv);
+        }
         usernameInput.focus();
         return false;
     }
@@ -566,7 +477,9 @@ function validateUsernameForm() {
         errorDiv.id = 'username-error';
         errorDiv.className = 'text-red-500 text-sm mt-1';
         errorDiv.textContent = 'Username can only contain letters, numbers, spaces, hyphens, and underscores';
-        usernameInput.parentNode.appendChild(errorDiv);
+        if (usernameInput.parentNode) {
+            usernameInput.parentNode.appendChild(errorDiv);
+        }
         usernameInput.focus();
         return false;
     }
@@ -575,7 +488,7 @@ function validateUsernameForm() {
 }
 
 function selectTicket(ticketId) {
-    fetch(`/session/{{.Session.ID}}/select-ticket/${ticketId}`, {
+    fetch('/session/' + window.sessionId + '/select-ticket/' + ticketId, {
         method: 'POST'
     }).then(response => {
         if (response.ok) {
@@ -586,7 +499,7 @@ function selectTicket(ticketId) {
 }
 
 function startVoting() {
-    fetch(`/session/{{.Session.ID}}/start-voting`, {
+    fetch('/session/' + window.sessionId + '/start-voting', {
         method: 'POST'
     }).then(response => {
         if (response.ok) {
@@ -596,7 +509,7 @@ function startVoting() {
 }
 
 function endVoting() {
-    fetch(`/session/{{.Session.ID}}/end-voting`, {
+    fetch('/session/' + window.sessionId + '/end-voting', {
         method: 'POST'
     }).then(response => {
         if (response.ok) {
@@ -606,7 +519,7 @@ function endVoting() {
 }
 
 function nextTicket() {
-    fetch(`/session/{{.Session.ID}}/next-ticket`, {
+    fetch('/session/' + window.sessionId + '/next-ticket', {
         method: 'POST'
     }).then(response => {
         if (response.ok) {
@@ -625,12 +538,12 @@ function castVote(voteValue) {
     window.currentUserVote = voteValue;
     
     // Send vote to server - WebSocket will handle all other updates
-    fetch(`/session/{{.Session.ID}}/vote`, {
+    fetch('/session/' + window.sessionId + '/vote', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: `vote=${encodeURIComponent(voteValue)}`
+        body: 'vote=' + encodeURIComponent(voteValue)
     }).then(response => {
         if (!response.ok) {
             console.error('Failed to cast vote');
@@ -644,9 +557,12 @@ function castVote(voteValue) {
                     </div>
                 `;
             }
-            // Revert card highlighting on error
-            selectedCard.classList.remove('border-blue-500', 'bg-blue-50');
-            selectedCard.classList.add('border-gray-300');
+            // Revert card highlighting on error - find the card again
+            const selectedCard = document.querySelector(`[data-value="${voteValue}"]`);
+            if (selectedCard) {
+                selectedCard.classList.remove('border-blue-500', 'bg-blue-50');
+                selectedCard.classList.add('border-gray-300');
+            }
         } else {
             console.log('Vote cast successfully:', voteValue);
             // WebSocket will handle the complete UI update
@@ -662,7 +578,8 @@ function castVote(voteValue) {
                 </div>
             `;
         }
-        // Revert card highlighting on error
+        // Revert card highlighting on error - find the card again
+        const selectedCard = document.querySelector(`[data-value="${voteValue}"]`);
         if (selectedCard) {
             selectedCard.classList.remove('border-blue-500', 'bg-blue-50');
             selectedCard.classList.add('border-gray-300');
@@ -672,83 +589,112 @@ function castVote(voteValue) {
 
 // Function to restore participant vote display from template data
 function updateParticipantVoteFromTemplate() {
-    // Use stored vote value if available
-    if (window.currentUserVote) {
-        console.log('Updating participant vote from stored value:', window.currentUserVote);
-        updateParticipantVote(window.currentUserVote);
-        return;
-    }
-    
-    // Fallback: get vote from template if no stored value
-    const voteStatusElement = document.getElementById('vote-status');
-    if (!voteStatusElement) return;
-    
-    const voteStatusText = voteStatusElement.textContent;
-    const voteMatch = voteStatusText.match(/Your vote: (.+)/);
-    
-    if (voteMatch) {
-        const currentVote = voteMatch[1].trim();
-        console.log('Updating participant vote from template:', currentVote);
-        updateParticipantVote(currentVote);
-    }
+    // Add delay to ensure DOM is stable after WebSocket update
+    setTimeout(() => {
+        try {
+            // Use stored vote value if available
+            if (window.currentUserVote) {
+                console.log('Updating participant vote from stored value:', window.currentUserVote);
+                updateParticipantVote(window.currentUserVote);
+                return;
+            }
+            
+            // Fallback: get vote from template if no stored value
+            const voteStatusElement = document.getElementById('vote-status');
+            if (!voteStatusElement) return;
+            
+            const voteStatusText = voteStatusElement.textContent;
+            const voteMatch = voteStatusText.match(/Your vote: (.+)/);
+            
+            if (voteMatch) {
+                const currentVote = voteMatch[1].trim();
+                console.log('Updating participant vote from template:', currentVote);
+                updateParticipantVote(currentVote);
+            }
+        } catch (error) {
+            console.error('Error in updateParticipantVoteFromTemplate:', error);
+        }
+    }, 100);
 }
 
 // WebSocket is handled globally in base template
 
 // Restore card highlighting after content refresh
 function restoreCardHighlighting(voteValue) {
-    console.log('Restoring card highlighting for vote:', voteValue);
-    
-    // Clear all card selections first
-    document.querySelectorAll('.voting-card').forEach(card => {
-        card.classList.remove('border-blue-500', 'bg-blue-50');
-        card.classList.add('border-gray-300');
-    });
-    
-    // Highlight the selected card
-    const selectedCard = document.querySelector(`[data-value="${voteValue}"]`);
-    if (selectedCard) {
-        selectedCard.classList.remove('border-gray-300');
-        selectedCard.classList.add('border-blue-500', 'bg-blue-50');
-        console.log('Card highlighting restored for:', voteValue);
-    } else {
-        console.log('Could not find card with value:', voteValue);
+    try {
+        console.log('Restoring card highlighting for vote:', voteValue);
+        
+        // Clear all card selections first
+        const votingCards = document.querySelectorAll('.voting-card');
+        if (votingCards.length === 0) {
+            console.log('No voting cards found, DOM may not be ready yet');
+            return;
+        }
+        
+        votingCards.forEach(card => {
+            if (card && card.classList) {
+                card.classList.remove('border-blue-500', 'bg-blue-50');
+                card.classList.add('border-gray-300');
+            }
+        });
+        
+        // Highlight the selected card
+        const selectedCard = document.querySelector(`[data-value="${voteValue}"]`);
+        if (selectedCard && selectedCard.classList) {
+            selectedCard.classList.remove('border-gray-300');
+            selectedCard.classList.add('border-blue-500', 'bg-blue-50');
+            console.log('Card highlighting restored for:', voteValue);
+        } else {
+            console.log('Could not find card with value:', voteValue);
+        }
+    } catch (error) {
+        console.error('Error in restoreCardHighlighting:', error);
     }
 }
 
 // Update participant vote display for current user
 function updateParticipantVote(voteValue) {
-    // Find the current user's participant card and update it
-    const currentUserId = {{if .User}}'{{.User.ID}}'{{else}}null{{end}};
-    if (!currentUserId) return;
-    
-    // Find all participant cards
-    const participantCards = document.querySelectorAll('.grid.grid-cols-2 > div');
-    
-    participantCards.forEach(card => {
-        // Check if this card belongs to the current user
-        const username = card.querySelector('.text-sm.font-medium');
-        const currentUserName = '{{if .User}}{{.User.Username}}{{end}}';
+    try {
+        // Find the current user's participant card and update it
+        const currentUserId = {{if .User}}'{{.User.ID}}'{{else}}null{{end}};
+        if (!currentUserId) return;
         
-        if (username && username.textContent.trim() === currentUserName) {
-            // Find the vote display area in this card
-            const voteDisplay = card.querySelector('.w-12.h-16');
-            if (voteDisplay) {
-                // Check if voting is active to determine display style
-                const isVotingActive = {{.Session.IsVotingActive}};
-                
-                if (isVotingActive) {
-                    // Show check mark for active voting
-                    voteDisplay.className = 'w-12 h-16 bg-blue-600 rounded-lg flex items-center justify-center';
-                    voteDisplay.innerHTML = '<span class="material-icons text-white">check</span>';
-                } else {
-                    // Show vote value for inactive voting
-                    voteDisplay.className = 'w-12 h-16 bg-green-100 border-2 border-green-300 rounded-lg flex items-center justify-center';
-                    voteDisplay.innerHTML = `<span class="text-green-700 font-bold">${voteValue}</span>`;
+        // Find all participant cards
+        const participantCards = document.querySelectorAll('.grid.grid-cols-2 > div');
+        if (participantCards.length === 0) {
+            console.log('No participant cards found, DOM may not be ready yet');
+            return;
+        }
+        
+        participantCards.forEach(card => {
+            if (!card) return;
+            
+            // Check if this card belongs to the current user
+            const username = card.querySelector('.text-sm.font-medium');
+            const currentUserName = '{{if .User}}{{.User.Username}}{{end}}';
+            
+            if (username && username.textContent && username.textContent.trim() === currentUserName) {
+                // Find the vote display area in this card
+                const voteDisplay = card.querySelector('.w-12.h-16');
+                if (voteDisplay) {
+                    // Check if voting is active to determine display style
+                    const isVotingActive = {{.Session.IsVotingActive}};
+                    
+                    if (isVotingActive) {
+                        // Show check mark for active voting
+                        voteDisplay.className = 'w-12 h-16 bg-blue-600 rounded-lg flex items-center justify-center';
+                        voteDisplay.innerHTML = '<span class="material-icons text-white">check</span>';
+                    } else {
+                        // Show vote value for inactive voting
+                        voteDisplay.className = 'w-12 h-16 bg-green-100 border-2 border-green-300 rounded-lg flex items-center justify-center';
+                        voteDisplay.innerHTML = `<span class="text-green-700 font-bold">${voteValue}</span>`;
+                    }
                 }
             }
-        }
-    });
+        });
+    } catch (error) {
+        console.error('Error in updateParticipantVote:', error);
+    }
 }
 </script>
 {{end}}

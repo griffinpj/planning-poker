@@ -1,0 +1,42 @@
+# Ignore build artifacts
+main
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Ignore test files
+*_test.go
+
+# Ignore development files
+.env
+.env.local
+*.log
+
+# Ignore version control
+.git
+.gitignore
+
+# Ignore IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore database files (will be created in container)
+*.db
+*.sqlite
+*.sqlite3
+
+# Ignore temporary files
+tmp/
+temp/
+
+# Ignore documentation that's not needed in container
+README.md
+architecture.md
+requirements.md

@@ -1,0 +1,138 @@
+{{define "session-modals"}}
+<!-- Add Ticket Modal -->
+<div id="add-ticket-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+        <h3 class="text-xl font-bold mb-4">Add New Ticket</h3>
+        
+        <form hx-post="/session/{{.Session.ID}}/tickets" hx-on::before-request="if(!validateTicketForm()) event.preventDefault()" hx-on::after-request="if(event.detail.successful) { hideAddTicketModal(); } else if(event.detail.xhr.status >= 400) { handleFormError(event.detail.xhr.responseText); }" novalidate>
+            <div class="mb-4">
+                <label for="ticket-title" class="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                <input 
+                    type="text" 
+                    id="ticket-title" 
+                    name="title" 
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                    placeholder="Enter ticket title"
+                    required
+                    maxlength="200"
+                />
+            </div>
+            <div class="mb-6">
+                <label for="ticket-description" class="block text-sm font-medium text-gray-700 mb-2">Description (optional)</label>
+                <textarea 
+                    id="ticket-description" 
+                    name="description" 
+                    rows="3"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                    placeholder="Enter ticket description"
+                    maxlength="1000"
+                ></textarea>
+            </div>
+            <div class="flex space-x-3">
+                <button 
+                    type="button" 
+                    onclick="hideAddTicketModal()"
+                    class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
+                >
+                    Cancel
+                </button>
+                <button 
+                    type="submit" 
+                    class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"
+                >
+                    Add Ticket
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- End Session Modal (Owner Only) -->
+<div id="end-session-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+        <h3 class="text-xl font-bold mb-4 text-red-600">End Session</h3>
+        <p class="text-gray-700 mb-6">Are you sure you want to end this session? This will remove all participants and cannot be undone.</p>
+        <div class="flex space-x-3">
+            <button 
+                type="button" 
+                onclick="hideEndSessionModal()"
+                class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
+            >
+                Cancel
+            </button>
+            <form class="flex-1" hx-delete="/session/{{.Session.ID}}" hx-on::after-request="window.location.href='/'">
+                <button 
+                    type="submit" 
+                    onclick="hideEndSessionModal()"
+                    class="w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700"
+                >
+                    End Session
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Leave Session Modal (Participants) -->
+<div id="leave-session-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+        <h3 class="text-xl font-bold mb-4">Leave Session</h3>
+        <p class="text-gray-700 mb-6">Are you sure you want to leave this session?</p>
+        <div class="flex space-x-3">
+            <button 
+                type="button" 
+                onclick="hideLeaveSessionModal()"
+                class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
+            >
+                Cancel
+            </button>
+            <form class="flex-1" hx-post="/session/{{.Session.ID}}/leave" hx-on::after-request="window.location.href='/'">
+                <button 
+                    type="submit" 
+                    onclick="hideLeaveSessionModal()"
+                    class="w-full bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700"
+                >
+                    Leave Session
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Username Modal -->
+<div id="edit-username-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+        <h3 class="text-xl font-bold mb-4">Change Nickname</h3>
+        <form hx-post="/set-username" hx-on::after-request="if(event.detail.successful) { hideEditUsernameModal(); window.location.reload(); }" novalidate hx-on::before-request="if(!validateUsernameForm()) event.preventDefault()">
+            <input type="hidden" name="redirect_to" value="/session/{{.Session.ID}}">
+            <div class="mb-6">
+                <label for="new-username" class="block text-sm font-medium text-gray-700 mb-2">New Nickname</label>
+                <input 
+                    type="text" 
+                    id="new-username" 
+                    name="username" 
+                    value="{{.User.Username}}"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                    placeholder="Enter your new nickname"
+                    maxlength="50"
+                />
+            </div>
+            <div class="flex space-x-3">
+                <button 
+                    type="button" 
+                    onclick="hideEditUsernameModal()"
+                    class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
+                >
+                    Cancel
+                </button>
+                <button 
+                    type="submit" 
+                    class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"
+                >
+                    Update Nickname
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{{end}}

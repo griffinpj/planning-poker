@@ -6,7 +6,7 @@
     <title>{{.Title}} - Sprint Planning Poker</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" media="print" onload="this.media='all'; this.onload=null;">
     <link href="/static/css/app.css" rel="stylesheet">
     <style>
         .card {
@@ -102,6 +102,9 @@
         {{if eq .Template "home"}}{{template "home-content" .}}{{end}}
         {{if eq .Template "session"}}{{template "session-content" .}}{{end}}
     </main>
+
+    <!-- Session Modals (only for session pages) -->
+    {{if eq .Template "session"}}{{template "session-modals" .}}{{end}}
 
     <script src="/static/js/app.js"></script>
     <script>
