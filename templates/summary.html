@@ -56,11 +56,15 @@
                             {{end}}
                         </div>
                         <div class="ml-4 text-right">
+                            {{$ticketAvg := index $.TicketAverages .ID}}
                             {{if .FinalEstimate}}
                             <div class="text-2xl font-bold text-green-600">{{.FinalEstimate}}</div>
                             <div class="text-xs text-gray-500">Final Estimate</div>
+                            {{else if $ticketAvg}}
+                            <div class="text-2xl font-bold text-purple-600">{{printf "%.1f" $ticketAvg}}</div>
+                            <div class="text-xs text-gray-500">Average Vote</div>
                             {{else}}
-                            <div class="text-gray-400">No estimate</div>
+                            <div class="text-gray-400">No votes</div>
                             {{end}}
                         </div>
                     </div>

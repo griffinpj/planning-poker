@@ -283,7 +283,8 @@
                     </button>
                     {{end}}
 
-                    <!-- Next Ticket -->
+                    <!-- Next Ticket (only show if there's a next ticket) -->
+                    {{if and .Session.CurrentTicket (lt .CurrentTicketIndex (len .Session.Tickets))}}
                     <button 
                         class="btn bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
                         onclick="nextTicket()"
@@ -291,6 +292,7 @@
                         <span class="material-icons text-sm mr-1">skip_next</span>
                         Next Ticket
                     </button>
+                    {{end}}
 
                     <!-- Review Session -->
                     <button 

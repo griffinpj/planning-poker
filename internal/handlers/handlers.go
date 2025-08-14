@@ -411,18 +411,20 @@ func (h *Handler) calculateVoteHistogram(votes []models.Vote) []VoteCount {
 	}
 
 	var histogram []VoteCount
-	for _, card := range models.AllVotingCards() {
-		count := voteCounts[card]
-		percentage := 0
-		if total > 0 {
-			percentage = (count * 100) / total
+	// Only include vote values that actually received votes
+	for voteValue, count := range voteCounts {
+		if count > 0 {
+			percentage := 0
+			if total > 0 {
+				percentage = (count * 100) / total
+			}
+			
+			histogram = append(histogram, VoteCount{
+				Value:      voteValue,
+				Count:      count,
+				Percentage: percentage,
+			})
 		}
-		
-		histogram = append(histogram, VoteCount{
-			Value:      card,
-			Count:      count,
-			Percentage: percentage,
-		})
 	}
 
 	return histogram
