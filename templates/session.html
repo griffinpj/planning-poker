@@ -1,5 +1,5 @@
 {{define "session-content"}}
-<div hx-ext="sse" hx-sse="connect:/session/{{.Session.ID}}/events">
+<div id="session-content">
     <div class="grid lg:grid-cols-4 gap-6">
         <!-- Participants Sidebar -->
         <div class="lg:col-span-1">
@@ -45,6 +45,9 @@
                         {{if $ticket.FinalEstimate}}
                         <div class="text-xs text-green-600 font-medium">Estimated: {{$ticket.FinalEstimate}}</div>
                         {{end}}
+                        {{if index $.TicketAverages $ticket.ID}}
+                        <div class="text-xs text-purple-600 font-medium">Avg: {{printf "%.1f" (index $.TicketAverages $ticket.ID)}}</div>
+                        {{end}}
                         {{if and $.Session.CurrentTicket (eq $ticket.ID $.Session.CurrentTicket.ID)}}
                         <div class="text-xs text-blue-600 font-medium">Current ticket</div>
                         {{end}}
@@ -54,6 +57,9 @@
                         <div class="text-sm font-medium">{{$ticket.Title}}</div>
                         {{if $ticket.FinalEstimate}}
                         <div class="text-xs text-green-600 font-medium">Estimated: {{$ticket.FinalEstimate}}</div>
+                        {{end}}
+                        {{if index $.TicketAverages $ticket.ID}}
+                        <div class="text-xs text-purple-600 font-medium">Avg: {{printf "%.1f" (index $.TicketAverages $ticket.ID)}}</div>
                         {{end}}
                         {{if and $.Session.CurrentTicket (eq $ticket.ID $.Session.CurrentTicket.ID)}}
                         <div class="text-xs text-blue-600 font-medium">Current ticket</div>
@@ -109,13 +115,12 @@
                     <span class="text-sm font-normal text-gray-600">(Voting not started)</span>
                     {{end}}
                 </h3>
-                <div id="voting-cards" class="grid grid-cols-5 md:grid-cols-11 gap-3">
+                <div id="voting-cards" class="grid grid-cols-4 md:grid-cols-7 lg:grid-cols-14 gap-3">
                     {{range .VotingCards}}
                     <button 
-                        class="card voting-card bg-white border-2 border-gray-300 rounded-lg p-4 text-center hover:border-blue-500 focus:outline-none focus:border-blue-500 {{if and $.UserVote (eq . $.UserVote.VoteValue)}}border-blue-500 bg-blue-50{{end}} {{if not $.Session.IsVotingActive}}opacity-50 cursor-not-allowed{{end}}"
+                        class="card voting-card bg-white border-2 border-gray-300 rounded-lg p-4 text-center hover:border-blue-500 focus:outline-none focus:border-blue-500 {{if and $.UserVote (eq . $.UserVote.VoteValue)}}border-blue-500 bg-blue-50{{end}}"
                         data-value="{{.}}"
                         onclick="castVote('{{.}}')"
-                        {{if not $.Session.IsVotingActive}}disabled{{end}}
                     >
                         <span class="text-lg font-bold">{{.}}</span>
                     </button>
@@ -126,6 +131,9 @@
                     <div class="text-green-600 font-medium">
                         <span class="material-icons text-sm mr-1">check_circle</span>
                         Your vote: {{.UserVote.VoteValue}}
+                        {{if not .Session.IsVotingActive}}
+                        <span class="text-gray-500 text-sm"> • Click any card to change your vote</span>
+                        {{end}}
                     </div>
                     {{else if .Session.IsVotingActive}}
                     <div class="text-gray-500">
@@ -134,8 +142,8 @@
                     </div>
                     {{else}}
                     <div class="text-gray-500">
-                        <span class="material-icons text-sm mr-1">timer</span>
-                        Voting not started - wait for session owner
+                        <span class="material-icons text-sm mr-1">assignment</span>
+                        Click any card to cast your vote
                     </div>
                     {{end}}
                 </div>
@@ -286,7 +294,7 @@
     <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
         <h3 class="text-xl font-bold mb-4">Add New Ticket</h3>
         
-        <form hx-post="/session/{{.Session.ID}}/tickets" hx-on::before-request="if(!validateTicketForm()) event.preventDefault()" hx-on::after-request="if(event.detail.successful) { hideAddTicketModal(); window.location.reload(); } else if(event.detail.xhr.status >= 400) { handleFormError(event.detail.xhr.responseText); }" novalidate>
+        <form hx-post="/session/{{.Session.ID}}/tickets" hx-on::before-request="if(!validateTicketForm()) event.preventDefault()" hx-on::after-request="if(event.detail.successful) { hideAddTicketModal(); } else if(event.detail.xhr.status >= 400) { handleFormError(event.detail.xhr.responseText); }" novalidate>
             <div class="mb-4">
                 <label for="ticket-title" class="block text-sm font-medium text-gray-700 mb-2">Title</label>
                 <input 
@@ -607,8 +615,103 @@ function nextTicket() {
     });
 }
 
+// Store the user's current vote for restoration after WebSocket updates
+window.currentUserVote = null;
+
 function castVote(voteValue) {
-    // Immediately update UI to show selection
+    console.log('Casting vote:', voteValue);
+    
+    // Store the vote for later restoration
+    window.currentUserVote = voteValue;
+    
+    // Show immediate visual feedback on the card
+    document.querySelectorAll('.voting-card').forEach(card => {
+        card.classList.remove('border-blue-500', 'bg-blue-50');
+        card.classList.add('border-gray-300');
+    });
+    
+    const selectedCard = document.querySelector(`[data-value="${voteValue}"]`);
+    if (selectedCard) {
+        selectedCard.classList.remove('border-gray-300');
+        selectedCard.classList.add('border-blue-500', 'bg-blue-50');
+    }
+    
+    // Send vote to server - WebSocket will handle all other updates
+    fetch(`/session/{{.Session.ID}}/vote`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `vote=${encodeURIComponent(voteValue)}`
+    }).then(response => {
+        if (!response.ok) {
+            console.error('Failed to cast vote');
+            // Show error message 
+            const voteStatus = document.getElementById('vote-status');
+            if (voteStatus) {
+                voteStatus.innerHTML = `
+                    <div class="text-red-600 font-medium">
+                        <span class="material-icons text-sm mr-1">error</span>
+                        Failed to cast vote. Please try again.
+                    </div>
+                `;
+            }
+            // Revert card highlighting on error
+            selectedCard.classList.remove('border-blue-500', 'bg-blue-50');
+            selectedCard.classList.add('border-gray-300');
+        } else {
+            console.log('Vote cast successfully:', voteValue);
+            // WebSocket will handle the complete UI update
+        }
+    }).catch(error => {
+        console.error('Error casting vote:', error);
+        const voteStatus = document.getElementById('vote-status');
+        if (voteStatus) {
+            voteStatus.innerHTML = `
+                <div class="text-red-600 font-medium">
+                    <span class="material-icons text-sm mr-1">error</span>
+                    Network error. Please check your connection.
+                </div>
+            `;
+        }
+        // Revert card highlighting on error
+        if (selectedCard) {
+            selectedCard.classList.remove('border-blue-500', 'bg-blue-50');
+            selectedCard.classList.add('border-gray-300');
+        }
+    });
+}
+
+// Function to restore participant vote display from template data
+function updateParticipantVoteFromTemplate() {
+    // Use stored vote value if available
+    if (window.currentUserVote) {
+        console.log('Updating participant vote from stored value:', window.currentUserVote);
+        updateParticipantVote(window.currentUserVote);
+        return;
+    }
+    
+    // Fallback: get vote from template if no stored value
+    const voteStatusElement = document.getElementById('vote-status');
+    if (!voteStatusElement) return;
+    
+    const voteStatusText = voteStatusElement.textContent;
+    const voteMatch = voteStatusText.match(/Your vote: (.+)/);
+    
+    if (voteMatch) {
+        const currentVote = voteMatch[1].trim();
+        console.log('Updating participant vote from template:', currentVote);
+        updateParticipantVote(currentVote);
+    }
+}
+
+// WebSocket is handled globally in base template
+
+// Restore card highlighting after content refresh
+function restoreCardHighlighting(voteValue) {
+    console.log('Restoring card highlighting for vote:', voteValue);
+    
+    // Clear all card selections first
     document.querySelectorAll('.voting-card').forEach(card => {
         card.classList.remove('border-blue-500', 'bg-blue-50');
         card.classList.add('border-gray-300');
@@ -619,90 +722,45 @@ function castVote(voteValue) {
     if (selectedCard) {
         selectedCard.classList.remove('border-gray-300');
         selectedCard.classList.add('border-blue-500', 'bg-blue-50');
+        console.log('Card highlighting restored for:', voteValue);
+    } else {
+        console.log('Could not find card with value:', voteValue);
     }
-    
-    // Update vote status
-    const voteStatus = document.getElementById('vote-status');
-    if (voteStatus) {
-        voteStatus.innerHTML = `
-            <div class="text-green-600 font-medium">
-                <span class="material-icons text-sm mr-1">check_circle</span>
-                Your vote: ${voteValue}
-            </div>
-        `;
-    }
-    
-    // Send vote to server
-    fetch(`/session/{{.Session.ID}}/vote`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `vote=${encodeURIComponent(voteValue)}`
-    }).then(response => {
-        if (!response.ok) {
-            console.error('Failed to cast vote');
-            // Revert UI changes on failure
-            window.location.reload();
-        }
-        // Don't reload on success - let SSE handle updates for other users
-    }).catch(error => {
-        console.error('Error casting vote:', error);
-        // Revert UI changes on error
-        window.location.reload();
-    });
 }
 
-// Handle SSE events
-document.body.addEventListener('htmx:sseMessage', function(e) {
-    const eventType = e.detail.type;
-    console.log('SSE Event received:', eventType, e.detail.data);
+// Update participant vote display for current user
+function updateParticipantVote(voteValue) {
+    // Find the current user's participant card and update it
+    const currentUserId = {{if .User}}'{{.User.ID}}'{{else}}null{{end}};
+    if (!currentUserId) return;
     
-    switch(eventType) {
-        case 'user-joined':
-        case 'user-left':
-        case 'voting-started':
-        case 'voting-ended':
-        case 'vote-cast':
-        case 'ticket-changed':
-        case 'ticket-created':
-        case 'ticket-deleted':
-        case 'ticket-updated':
-            // Use HTMX to refresh just the session content without breaking SSE
-            console.log('Refreshing content for:', eventType);
-            const sessionId = window.location.pathname.split('/session/')[1];
-            if (sessionId) {
-                htmx.ajax('GET', `/session/${sessionId}/partial`, {
-                    target: '#main-content',
-                    swap: 'innerHTML'
-                });
+    // Find all participant cards
+    const participantCards = document.querySelectorAll('.grid.grid-cols-2 > div');
+    
+    participantCards.forEach(card => {
+        // Check if this card belongs to the current user
+        const username = card.querySelector('.text-sm.font-medium');
+        const currentUserName = '{{if .User}}{{.User.Username}}{{end}}';
+        
+        if (username && username.textContent.trim() === currentUserName) {
+            // Find the vote display area in this card
+            const voteDisplay = card.querySelector('.w-12.h-16');
+            if (voteDisplay) {
+                // Check if voting is active to determine display style
+                const isVotingActive = {{.Session.IsVotingActive}};
+                
+                if (isVotingActive) {
+                    // Show check mark for active voting
+                    voteDisplay.className = 'w-12 h-16 bg-blue-600 rounded-lg flex items-center justify-center';
+                    voteDisplay.innerHTML = '<span class="material-icons text-white">check</span>';
+                } else {
+                    // Show vote value for inactive voting
+                    voteDisplay.className = 'w-12 h-16 bg-green-100 border-2 border-green-300 rounded-lg flex items-center justify-center';
+                    voteDisplay.innerHTML = `<span class="text-green-700 font-bold">${voteValue}</span>`;
+                }
             }
-            break;
-        case 'session-ended':
-            // Redirect to home with a message
-            alert('This session has been ended by the owner.');
-            window.location.href = '/';
-            break;
-        case 'connected':
-        case 'heartbeat':
-            // Ignore connection/heartbeat events
-            break;
-        default:
-            console.log('Unknown SSE event type:', eventType);
-    }
-});
-
-// Debug SSE connection
-document.body.addEventListener('htmx:sseOpen', function(e) {
-    console.log('SSE connection opened:', e);
-});
-
-document.body.addEventListener('htmx:sseError', function(e) {
-    console.log('SSE connection error:', e);
-});
-
-document.body.addEventListener('htmx:sseClose', function(e) {
-    console.log('SSE connection closed:', e);
-});
+        }
+    });
+}
 </script>
 {{end}}

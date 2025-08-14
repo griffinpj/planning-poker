@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"html"
 	"regexp"
 	"strings"
 )
@@ -130,14 +129,15 @@ func ValidateTicketDescription(description string) ValidationErrors {
 }
 
 func SanitizeInput(input string) string {
-	// Trim whitespace and escape HTML
-	return html.EscapeString(strings.TrimSpace(input))
+	// Only trim whitespace for most inputs to preserve special characters like emojis
+	// HTML escaping will be done in templates using the html/template package
+	return strings.TrimSpace(input)
 }
 
 func ValidateVoteValue(voteValue string) ValidationErrors {
 	var errors ValidationErrors
 	
-	validVotes := []string{"0", "1", "2", "3", "5", "8", "13", "21", "34", "☕", "?"}
+	validVotes := []string{"0", "1", "2", "3", "5", "8", "13", "21", "34", "55", "89", "144", "☕", "?"}
 	
 	for _, valid := range validVotes {
 		if voteValue == valid {

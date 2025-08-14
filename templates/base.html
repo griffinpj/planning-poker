@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}} - Sprint Planning Poker</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link href="/static/css/app.css" rel="stylesheet">
@@ -121,6 +120,148 @@
             alert('Failed to copy URL. Please copy manually: ' + url);
         });
     }
+
+    // WebSocket connection for session pages
+    let ws = null;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    
+    // Get current user ID from page data
+    const currentUserId = {{if .User}}'{{.User.ID}}'{{else}}null{{end}};
+
+    function connectWebSocket() {
+        // Only connect if we're on a session page
+        const sessionMatch = window.location.pathname.match(/^\/session\/([^\/]+)$/);
+        if (!sessionMatch) return;
+        
+        const sessionId = sessionMatch[1];
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/session/${sessionId}/ws`;
+        
+        // Close existing connection if any
+        if (ws && ws.readyState !== WebSocket.CLOSED) {
+            ws.close();
+        }
+        
+        ws = new WebSocket(wsUrl);
+        
+        ws.onopen = function(event) {
+            console.log('WebSocket connection opened');
+            reconnectAttempts = 0;
+        };
+        
+        ws.onmessage = function(event) {
+            try {
+                const message = JSON.parse(event.data);
+                console.log('WebSocket message received:', message.type, message.data);
+                
+                switch(message.type) {
+                    case 'user-joined':
+                    case 'user-left':
+                    case 'voting-started':
+                    case 'voting-ended':
+                        // Always refresh when voting ends to show results
+                        console.log('Voting ended - refreshing for all users');
+                        htmx.ajax('GET', `/session/${sessionId}/partial`, {
+                            target: '#session-content',
+                            swap: 'outerHTML'
+                        }).then(function() {
+                            // Restore current user's participant vote display after refresh
+                            if (typeof updateParticipantVoteFromTemplate === 'function') {
+                                setTimeout(updateParticipantVoteFromTemplate, 50);
+                            }
+                        });
+                        break;
+                    case 'vote-cast':
+                        // Always refresh to update participant votes and averages
+                        console.log('Vote cast by user:', message.data.user_id, 'Current user:', currentUserId);
+                        const isOwnVote = message.data.user_id === currentUserId;
+                        
+                        htmx.ajax('GET', `/session/${sessionId}/partial`, {
+                            target: '#session-content',
+                            swap: 'outerHTML'
+                        }).then(function() {
+                            if (isOwnVote) {
+                                // For own votes, restore card highlighting from stored value
+                                console.log('Restoring own vote highlighting');
+                                if (typeof restoreCardHighlighting === 'function' && window.currentUserVote) {
+                                    setTimeout(() => {
+                                        restoreCardHighlighting(window.currentUserVote);
+                                    }, 100);
+                                }
+                            }
+                            
+                            // Always restore participant vote display after refresh
+                            if (typeof updateParticipantVoteFromTemplate === 'function') {
+                                setTimeout(updateParticipantVoteFromTemplate, 150);
+                            }
+                        });
+                        break;
+                    case 'ticket-changed':
+                    case 'ticket-created':
+                    case 'ticket-deleted':
+                    case 'ticket-updated':
+                        // Use HTMX to refresh just the session content
+                        console.log('Refreshing content for:', message.type);
+                        htmx.ajax('GET', `/session/${sessionId}/partial`, {
+                            target: '#session-content',
+                            swap: 'outerHTML'
+                        }).then(function() {
+                            // Restore current user's participant vote display after refresh
+                            if (typeof updateParticipantVoteFromTemplate === 'function') {
+                                setTimeout(updateParticipantVoteFromTemplate, 50);
+                            }
+                        });
+                        break;
+                    case 'session-ended':
+                        alert('This session has been ended by the owner.');
+                        window.location.href = '/';
+                        break;
+                    case 'connected':
+                        console.log('WebSocket connection confirmed');
+                        break;
+                    default:
+                        console.log('Unknown WebSocket message type:', message.type);
+                }
+            } catch (error) {
+                console.error('Error parsing WebSocket message:', error);
+            }
+        };
+        
+        ws.onclose = function(event) {
+            console.log('WebSocket connection closed:', event.code, event.reason);
+            
+            // Only attempt to reconnect if we're still on a session page
+            const stillOnSession = window.location.pathname.match(/^\/session\/([^\/]+)$/);
+            if (stillOnSession && reconnectAttempts < maxReconnectAttempts) {
+                reconnectAttempts++;
+                const delay = Math.pow(2, reconnectAttempts) * 1000;
+                console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts})`);
+                setTimeout(connectWebSocket, delay);
+            }
+        };
+        
+        ws.onerror = function(error) {
+            console.error('WebSocket error:', error);
+        };
+    }
+
+    // Connect WebSocket when page loads
+    document.addEventListener('DOMContentLoaded', connectWebSocket);
+
+    // Reconnect WebSocket when page becomes visible again
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden && (!ws || ws.readyState === WebSocket.CLOSED)) {
+            connectWebSocket();
+        }
+    });
+
+    // Clean up WebSocket when leaving the page
+    window.addEventListener('beforeunload', function() {
+        if (ws) {
+            ws.close();
+        }
+    });
     </script>
 </body>
 </html>

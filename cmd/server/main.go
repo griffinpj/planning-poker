@@ -29,9 +29,10 @@ func main() {
 	sessionService := services.NewSessionService(db.DB)
 	votingService := services.NewVotingService(db.DB)
 	ticketService := services.NewTicketService(db.DB)
-	sseService := services.NewSSEService()
+	wsService := services.NewWSService()
+	go wsService.Run() // Start the WebSocket service
 
-	h := handlers.NewHandler(userService, sessionService, votingService, ticketService, sseService)
+	h := handlers.NewHandler(userService, sessionService, votingService, ticketService, wsService)
 
 	r := chi.NewRouter()
 
@@ -56,7 +57,7 @@ func main() {
 		r.Post("/{sessionID}/next-ticket", h.NextTicket)
 		r.Post("/{sessionID}/select-ticket/{ticketID}", h.SelectTicket)
 		r.Post("/{sessionID}/vote", h.SubmitVote)
-		r.Get("/{sessionID}/events", h.SSEHandler)
+		r.Get("/{sessionID}/ws", h.WebSocketHandler)
 		r.Post("/{sessionID}/leave", h.LeaveSession)
 		r.Delete("/{sessionID}", h.DeleteSession)
 	})

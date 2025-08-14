@@ -74,7 +74,7 @@ const (
 	VotingCards = "0,1,2,3,5,8,13,21,34,☕,?"
 )
 
-var FibonacciCards = []string{"0", "1", "2", "3", "5", "8", "13", "21", "34"}
+var FibonacciCards = []string{"0", "1", "2", "3", "5", "8", "13", "21", "34", "55", "89", "144"}
 var SpecialCards = []string{"☕", "?"}
 
 func AllVotingCards() []string {

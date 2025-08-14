@@ -35,13 +35,10 @@ func (h *Handler) SubmitVote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Allow voting during active voting OR after voting has ended (for vote changes)
+	// Only prevent voting if no current ticket is selected
 	if session.CurrentTicket == nil {
 		http.Error(w, "No active ticket", http.StatusBadRequest)
-		return
-	}
-
-	if !session.IsVotingActive {
-		http.Error(w, "Voting is not active", http.StatusBadRequest)
 		return
 	}
 
@@ -64,7 +61,7 @@ func (h *Handler) SubmitVote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.sseService.Broadcast(sessionID, models.SSEMessage{
+	h.wsService.Broadcast(sessionID, models.SSEMessage{
 		Type: "vote-cast",
 		Data: map[string]interface{}{
 			"user_id": user.ID,
@@ -118,7 +115,7 @@ func (h *Handler) StartVoting(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.sseService.Broadcast(sessionID, models.SSEMessage{
+	h.wsService.Broadcast(sessionID, models.SSEMessage{
 		Type: "voting-started",
 		Data: session.CurrentTicket,
 	})
@@ -164,7 +161,7 @@ func (h *Handler) EndVoting(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.sseService.Broadcast(sessionID, models.SSEMessage{
+	h.wsService.Broadcast(sessionID, models.SSEMessage{
 		Type: "voting-ended",
 		Data: map[string]interface{}{
 			"ticket": session.CurrentTicket,
@@ -227,7 +224,7 @@ func (h *Handler) NextTicket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.sseService.Broadcast(sessionID, models.SSEMessage{
+	h.wsService.Broadcast(sessionID, models.SSEMessage{
 		Type: "ticket-changed",
 		Data: nextTicket,
 	})
@@ -290,7 +287,7 @@ func (h *Handler) SelectTicket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.sseService.Broadcast(sessionID, models.SSEMessage{
+	h.wsService.Broadcast(sessionID, models.SSEMessage{
 		Type: "ticket-changed",
 		Data: selectedTicket,
 	})

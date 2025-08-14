@@ -16,11 +16,11 @@ type Handler struct {
 	sessionService *services.SessionService
 	votingService  *services.VotingService
 	ticketService  *services.TicketService
-	sseService     *services.SSEService
+	wsService      *services.WSService
 	templates      *template.Template
 }
 
-func NewHandler(userService *services.UserService, sessionService *services.SessionService, votingService *services.VotingService, ticketService *services.TicketService, sseService *services.SSEService) *Handler {
+func NewHandler(userService *services.UserService, sessionService *services.SessionService, votingService *services.VotingService, ticketService *services.TicketService, wsService *services.WSService) *Handler {
 	templates := template.Must(template.ParseGlob("templates/*.html"))
 	
 	return &Handler{
@@ -28,7 +28,7 @@ func NewHandler(userService *services.UserService, sessionService *services.Sess
 		sessionService: sessionService,
 		votingService:  votingService,
 		ticketService:  ticketService,
-		sseService:     sseService,
+		wsService:      wsService,
 		templates:      templates,
 	}
 }
@@ -43,6 +43,7 @@ type PageData struct {
 	UserVote        *models.Vote
 	VoteHistogram   []VoteCount
 	CurrentTicketIndex int
+	TicketAverages  map[int]float64 // ticket ID -> average
 }
 
 type VoteCount struct {
@@ -162,6 +163,16 @@ func (h *Handler) GetSessionPartial(w http.ResponseWriter, r *http.Request) {
 	var userVote *models.Vote
 	var voteHistogram []VoteCount
 	var currentTicketIndex int
+	
+	// Calculate averages for all tickets
+	ticketAverages := make(map[int]float64)
+	for _, ticket := range session.Tickets {
+		if len(ticket.Votes) > 0 {
+			if avg := h.calculateVoteAverage(ticket.Votes); avg != nil {
+				ticketAverages[ticket.ID] = *avg
+			}
+		}
+	}
 
 	if session.CurrentTicket != nil {
 		for i, ticket := range session.Tickets {
@@ -193,6 +204,7 @@ func (h *Handler) GetSessionPartial(w http.ResponseWriter, r *http.Request) {
 		UserVote:           userVote,
 		VoteHistogram:      voteHistogram,
 		CurrentTicketIndex: currentTicketIndex,
+		TicketAverages:     ticketAverages,
 	}
 
 	// Return only the session content, not the full page
@@ -227,7 +239,7 @@ func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
 
 	// Only broadcast if user actually joined (wasn't already a participant)
 	if userJoined {
-		h.sseService.Broadcast(sessionID, models.SSEMessage{
+		h.wsService.Broadcast(sessionID, models.SSEMessage{
 			Type: "user-joined",
 			Data: user,
 		})
@@ -242,6 +254,16 @@ func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
 	var userVote *models.Vote
 	var voteHistogram []VoteCount
 	var currentTicketIndex int
+	
+	// Calculate averages for all tickets
+	ticketAverages := make(map[int]float64)
+	for _, ticket := range session.Tickets {
+		if len(ticket.Votes) > 0 {
+			if avg := h.calculateVoteAverage(ticket.Votes); avg != nil {
+				ticketAverages[ticket.ID] = *avg
+			}
+		}
+	}
 
 	if session.CurrentTicket != nil {
 		for i, ticket := range session.Tickets {
@@ -273,6 +295,7 @@ func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
 		UserVote:           userVote,
 		VoteHistogram:      voteHistogram,
 		CurrentTicketIndex: currentTicketIndex,
+		TicketAverages:     ticketAverages,
 	}
 
 	h.executeTemplate(w, "base.html", data)
@@ -295,7 +318,7 @@ func (h *Handler) JoinSession(w http.ResponseWriter, r *http.Request) {
 
 	// Only broadcast if user actually joined (wasn't already a participant)
 	if userJoined {
-		h.sseService.Broadcast(sessionID, models.SSEMessage{
+		h.wsService.Broadcast(sessionID, models.SSEMessage{
 			Type: "user-joined",
 			Data: user,
 		})
@@ -319,7 +342,7 @@ func (h *Handler) LeaveSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.sseService.Broadcast(sessionID, models.SSEMessage{
+	h.wsService.Broadcast(sessionID, models.SSEMessage{
 		Type: "user-left",
 		Data: user,
 	})
@@ -352,7 +375,7 @@ func (h *Handler) DeleteSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Broadcast session end to all participants before deletion
-	h.sseService.Broadcast(sessionID, models.SSEMessage{
+	h.wsService.Broadcast(sessionID, models.SSEMessage{
 		Type: "session-ended",
 		Data: map[string]interface{}{
 			"message": "Session has been ended by the owner",
@@ -392,6 +415,65 @@ func (h *Handler) calculateVoteHistogram(votes []models.Vote) []VoteCount {
 	}
 
 	return histogram
+}
+
+func (h *Handler) calculateVoteAverage(votes []models.Vote) *float64 {
+	if len(votes) == 0 {
+		return nil
+	}
+	
+	var sum float64
+	var count int
+	
+	for _, vote := range votes {
+		// Only include numeric votes in average calculation
+		// Skip special cards like ☕ and ?
+		switch vote.VoteValue {
+		case "0", "1", "2", "3", "5", "8", "13", "21", "34", "55", "89", "144":
+			if val := parseVoteValue(vote.VoteValue); val >= 0 {
+				sum += float64(val)
+				count++
+			}
+		}
+	}
+	
+	if count == 0 {
+		return nil
+	}
+	
+	average := sum / float64(count)
+	return &average
+}
+
+func parseVoteValue(voteValue string) int {
+	switch voteValue {
+	case "0":
+		return 0
+	case "1":
+		return 1
+	case "2":
+		return 2
+	case "3":
+		return 3
+	case "5":
+		return 5
+	case "8":
+		return 8
+	case "13":
+		return 13
+	case "21":
+		return 21
+	case "34":
+		return 34
+	case "55":
+		return 55
+	case "89":
+		return 89
+	case "144":
+		return 144
+	default:
+		return -1 // Invalid/special vote
+	}
 }
 
 func (h *Handler) executeTemplate(w http.ResponseWriter, tmplName string, data interface{}) {

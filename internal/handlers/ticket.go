@@ -52,12 +52,18 @@ func (h *Handler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.sseService.Broadcast(sessionID, models.SSEMessage{
+	h.wsService.Broadcast(sessionID, models.SSEMessage{
 		Type: "ticket-created",
 		Data: ticket,
 	})
 
-	http.Redirect(w, r, "/session/"+sessionID, http.StatusSeeOther)
+	// Return success response for HTMX, redirect for regular requests
+	if r.Header.Get("HX-Request") != "" {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Ticket created successfully"))
+	} else {
+		http.Redirect(w, r, "/session/"+sessionID, http.StatusSeeOther)
+	}
 }
 
 func (h *Handler) DeleteTicket(w http.ResponseWriter, r *http.Request) {
@@ -124,7 +130,7 @@ func (h *Handler) DeleteTicket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.sseService.Broadcast(sessionID, models.SSEMessage{
+	h.wsService.Broadcast(sessionID, models.SSEMessage{
 		Type: "ticket-deleted",
 		Data: map[string]interface{}{
 			"ticket_id": ticketID,
@@ -204,7 +210,7 @@ func (h *Handler) UpdateTicket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.sseService.Broadcast(sessionID, models.SSEMessage{
+	h.wsService.Broadcast(sessionID, models.SSEMessage{
 		Type: "ticket-updated",
 		Data: ticket,
 	})

@@ -6,7 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func (h *Handler) SSEHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) WebSocketHandler(w http.ResponseWriter, r *http.Request) {
 	user := GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -40,7 +40,6 @@ func (h *Handler) SSEHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create SSE client and handle connection
-	client := h.sseService.AddClient(sessionID, user.ID, r)
-	h.sseService.HandleSSE(w, client)
+	// Handle WebSocket connection
+	h.wsService.HandleWebSocket(w, r, sessionID, user.ID)
 }
