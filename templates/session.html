@@ -172,7 +172,11 @@
                         {{end}}
                     {{end}}
                     {{end}}
-                    <div class="flex flex-col items-center p-3 bg-gray-50 rounded-lg">
+                    <div class="participant-card flex flex-col items-center p-3 bg-gray-50 rounded-lg relative cursor-pointer hover:bg-gray-100 transition-colors" 
+                         data-participant-id="{{$participant.ID}}" 
+                         data-participant-name="{{$participant.Username}}"
+                         onmouseenter="showEmojiPicker(this, event)" 
+                         onmouseleave="hideEmojiPicker()">
                         <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mb-2">
                             <span class="text-blue-600 font-medium text-sm">{{slice .Username 0 1}}</span>
                         </div>
@@ -717,5 +721,218 @@ function updateParticipantVote(voteValue) {
         console.error('Error in updateParticipantVote:', error);
     }
 }
+
+// Emoji Picker and Animation System
+let emojiPickerTimer;
+let currentTargetParticipant = null;
+
+// Track shake intensity for each participant (user ID -> shake level)
+let participantShakeIntensity = new Map();
+
+function showEmojiPicker(participantElement, event) {
+    // Don't show emoji picker for current user
+    const currentUserId = {{if .User}}'{{.User.ID}}'{{else}}null{{end}};
+    const targetId = participantElement.dataset.participantId;
+    
+    if (currentUserId === targetId) return;
+    
+    clearTimeout(emojiPickerTimer);
+    currentTargetParticipant = participantElement;
+    
+    const picker = document.getElementById('emoji-picker');
+    if (!picker) return;
+    
+    // Position picker near the participant
+    const rect = participantElement.getBoundingClientRect();
+    picker.style.left = (rect.right + 10) + 'px';
+    picker.style.top = rect.top + 'px';
+    picker.classList.remove('hidden');
+    
+    // Add click handlers to emoji options
+    const emojiOptions = picker.querySelectorAll('.emoji-option');
+    emojiOptions.forEach(option => {
+        option.onclick = function() {
+            sendEmojiReaction(this.dataset.emoji, targetId, participantElement.dataset.participantName);
+            // Don't hide picker - allow spam clicking!
+        };
+    });
+}
+
+function hideEmojiPicker() {
+    emojiPickerTimer = setTimeout(() => {
+        const picker = document.getElementById('emoji-picker');
+        if (picker) {
+            picker.classList.add('hidden');
+        }
+        currentTargetParticipant = null;
+    }, 100); // Small delay to allow clicking on emojis
+}
+
+function sendEmojiReaction(emoji, targetUserId, targetUsername) {
+    console.log('Sending emoji reaction:', emoji, 'to', targetUsername);
+    
+    // Send emoji reaction via WebSocket (ws is global from base template)
+    if (typeof ws !== 'undefined' && ws && ws.readyState === WebSocket.OPEN) {
+        const message = {
+            type: 'emoji-reaction',
+            data: {
+                emoji: emoji,
+                target_user_id: targetUserId,
+                target_username: targetUsername,
+                from_user_id: {{if .User}}'{{.User.ID}}'{{else}}null{{end}},
+                from_username: {{if .User}}'{{.User.Username}}'{{else}}null{{end}}
+            }
+        };
+        console.log('Sending WebSocket message:', message);
+        ws.send(JSON.stringify(message));
+    } else {
+        console.error('WebSocket not available or not connected');
+    }
+}
+
+function showEmojiAnimation(emoji, targetUserId, fromUsername) {
+    console.log('Showing emoji animation:', emoji, 'for user', targetUserId);
+    
+    // Find the target participant element
+    const targetElement = document.querySelector(`[data-participant-id="${targetUserId}"]`);
+    if (!targetElement) {
+        console.log('Target element not found for user:', targetUserId);
+        return;
+    }
+    
+    // Create flying emoji element
+    const flyingEmoji = document.createElement('div');
+    flyingEmoji.innerHTML = emoji;
+    flyingEmoji.className = 'emoji-reaction fixed pointer-events-none z-1000 text-4xl';
+    
+    // Start from random position at top of screen for more dramatic effect
+    const startX = Math.random() * window.innerWidth;
+    const startY = -50;
+    
+    flyingEmoji.style.left = startX + 'px';
+    flyingEmoji.style.top = startY + 'px';
+    flyingEmoji.style.transform = 'translate(-50%, -50%) rotate(0deg)';
+    flyingEmoji.style.transition = 'none'; // Start without transition
+    
+    document.body.appendChild(flyingEmoji);
+    
+    // Get target position
+    const targetRect = targetElement.getBoundingClientRect();
+    const targetX = targetRect.left + (targetRect.width / 2);
+    const targetY = targetRect.top + (targetRect.height / 2);
+    
+    // Phase 1: Fly to target with physics curve
+    setTimeout(() => {
+        flyingEmoji.style.transition = 'all 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        flyingEmoji.style.left = targetX + 'px';
+        flyingEmoji.style.top = targetY + 'px';
+        flyingEmoji.style.transform = 'translate(-50%, -50%) rotate(360deg) scale(1.2)';
+    }, 50);
+    
+    // Phase 2: Collision impact - bounce and shake with cumulative intensity
+    setTimeout(() => {
+        // Increase shake intensity for this participant
+        const currentIntensity = participantShakeIntensity.get(targetUserId) || 0;
+        const newIntensity = Math.min(currentIntensity + 1, 5); // Cap at 5 for sanity
+        participantShakeIntensity.set(targetUserId, newIntensity);
+        
+        // Apply shake with increasing intensity
+        const shakeClass = `shake-intensity-${newIntensity}`;
+        targetElement.className = targetElement.className.replace(/shake-intensity-\d+/g, '');
+        targetElement.classList.add(shakeClass);
+        targetElement.style.animation = `${shakeClass} ${0.4 + newIntensity * 0.1}s ease-in-out`;
+        
+        // Emoji bounces back slightly
+        flyingEmoji.style.transition = 'all 0.3s ease-out';
+        flyingEmoji.style.transform = 'translate(-50%, -50%) rotate(360deg) scale(1.5)';
+        
+        // Gradually reduce shake intensity over time
+        setTimeout(() => {
+            const reduceIntensity = () => {
+                const current = participantShakeIntensity.get(targetUserId) || 0;
+                if (current > 0) {
+                    const reduced = current - 1;
+                    participantShakeIntensity.set(targetUserId, reduced);
+                    
+                    if (reduced > 0) {
+                        const newShakeClass = `shake-intensity-${reduced}`;
+                        targetElement.className = targetElement.className.replace(/shake-intensity-\d+/g, '');
+                        targetElement.classList.add(newShakeClass);
+                        targetElement.style.animation = `${newShakeClass} ${0.3 + reduced * 0.1}s ease-in-out`;
+                        setTimeout(reduceIntensity, 600); // Reduce every 600ms
+                    } else {
+                        // Reset completely
+                        targetElement.style.animation = '';
+                        targetElement.className = targetElement.className.replace(/shake-intensity-\d+/g, '');
+                    }
+                }
+            };
+            reduceIntensity();
+        }, 300);
+    }, 1200);
+    
+    // Phase 3: Fall away with gravity physics
+    setTimeout(() => {
+        flyingEmoji.style.transition = 'all 1.0s cubic-bezier(0.55, 0.05, 0.68, 0.19)';
+        flyingEmoji.style.left = (targetX + (Math.random() - 0.5) * 100) + 'px';
+        flyingEmoji.style.top = (window.innerHeight + 100) + 'px'; // Fall off screen
+        flyingEmoji.style.transform = 'translate(-50%, -50%) rotate(' + (Math.random() * 720 - 360) + 'deg) scale(0.3)';
+        flyingEmoji.style.opacity = '0';
+    }, 1500);
+    
+    // Show notification
+    showEmojiNotification(emoji, fromUsername, targetElement.dataset.participantName);
+    
+    // Remove element after all animations
+    setTimeout(() => {
+        if (flyingEmoji.parentNode) {
+            flyingEmoji.parentNode.removeChild(flyingEmoji);
+        }
+    }, 2600);
+}
+
+function showEmojiNotification(emoji, fromUsername, toUsername) {
+    // Create temporary notification
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-4 right-4 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-50 animate-fade-in-up';
+    notification.innerHTML = `
+        <div class="flex items-center space-x-2">
+            <span class="text-2xl">${emoji}</span>
+            <span class="text-sm text-gray-600">
+                <strong>${fromUsername}</strong> reacted to <strong>${toUsername}</strong>
+            </span>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Remove notification after 3 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
+    }, 3000);
+}
+
+// Keep emoji picker open when hovering over it
+document.addEventListener('DOMContentLoaded', function() {
+    const picker = document.getElementById('emoji-picker');
+    if (picker) {
+        picker.onmouseenter = function() {
+            clearTimeout(emojiPickerTimer);
+        };
+        picker.onmouseleave = hideEmojiPicker;
+    }
+});
+
+// Test function for debugging emoji animations
+window.testEmojiAnimation = function() {
+    const participants = document.querySelectorAll('[data-participant-id]');
+    if (participants.length > 0) {
+        const target = participants[0];
+        showEmojiAnimation('🎉', target.dataset.participantId, 'Test User');
+    }
+};
+
 </script>
 {{end}}

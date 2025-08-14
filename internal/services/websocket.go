@@ -115,13 +115,16 @@ func (ws *WSService) readPump(client *WSClient) {
 
 	client.Conn.SetReadLimit(512)
 	for {
-		_, _, err := client.Conn.ReadMessage()
+		_, message, err := client.Conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("WebSocket error: %v", err)
 			}
 			break
 		}
+		
+		// Handle client messages (like emoji reactions)
+		ws.handleClientMessage(client, message)
 	}
 }
 
@@ -197,4 +200,31 @@ func (ws *WSService) GetClientCount(sessionID string) int {
 		}
 	}
 	return count
+}
+
+// ClientMessage represents a message sent from client to server
+type ClientMessage struct {
+	Type string      `json:"type"`
+	Data interface{} `json:"data"`
+}
+
+func (ws *WSService) handleClientMessage(client *WSClient, message []byte) {
+	var clientMsg ClientMessage
+	if err := json.Unmarshal(message, &clientMsg); err != nil {
+		log.Printf("Error parsing client message: %v", err)
+		return
+	}
+	
+	switch clientMsg.Type {
+	case "emoji-reaction":
+		// Broadcast emoji reaction to all clients in the session
+		emojiMessage := models.SSEMessage{
+			Type: "emoji-reaction",
+			Data: clientMsg.Data,
+		}
+		ws.Broadcast(client.SessionID, emojiMessage)
+		log.Printf("Emoji reaction broadcasted to session %s", client.SessionID)
+	default:
+		log.Printf("Unknown client message type: %s", clientMsg.Type)
+	}
 }
