@@ -45,8 +45,11 @@
                         {{if $ticket.FinalEstimate}}
                         <div class="text-xs text-green-600 font-medium">Estimated: {{$ticket.FinalEstimate}}</div>
                         {{end}}
-                        {{if and (index $.TicketAverages $ticket.ID) (not $.Session.IsVotingActive)}}
-                        <div class="text-xs text-purple-600 font-medium">Avg: {{printf "%.1f" (index $.TicketAverages $ticket.ID)}}</div>
+                        {{$ticketAvg := index $.TicketAverages $ticket.ID}}
+                        {{$isCurrentTicket := and $.Session.CurrentTicket (eq $ticket.ID $.Session.CurrentTicket.ID)}}
+                        {{$hideAverage := and $.Session.IsVotingActive $isCurrentTicket}}
+                        {{if and $ticketAvg (not $hideAverage)}}
+                        <div class="text-xs text-purple-600 font-medium">Avg: {{printf "%.1f" $ticketAvg}}</div>
                         {{end}}
                         {{if and $.Session.CurrentTicket (eq $ticket.ID $.Session.CurrentTicket.ID)}}
                         <div class="text-xs text-blue-600 font-medium">Current ticket</div>
@@ -58,8 +61,11 @@
                         {{if $ticket.FinalEstimate}}
                         <div class="text-xs text-green-600 font-medium">Estimated: {{$ticket.FinalEstimate}}</div>
                         {{end}}
-                        {{if and (index $.TicketAverages $ticket.ID) (not $.Session.IsVotingActive)}}
-                        <div class="text-xs text-purple-600 font-medium">Avg: {{printf "%.1f" (index $.TicketAverages $ticket.ID)}}</div>
+                        {{$ticketAvg := index $.TicketAverages $ticket.ID}}
+                        {{$isCurrentTicket := and $.Session.CurrentTicket (eq $ticket.ID $.Session.CurrentTicket.ID)}}
+                        {{$hideAverage := and $.Session.IsVotingActive $isCurrentTicket}}
+                        {{if and $ticketAvg (not $hideAverage)}}
+                        <div class="text-xs text-purple-600 font-medium">Avg: {{printf "%.1f" $ticketAvg}}</div>
                         {{end}}
                         {{if and $.Session.CurrentTicket (eq $ticket.ID $.Session.CurrentTicket.ID)}}
                         <div class="text-xs text-blue-600 font-medium">Current ticket</div>

@@ -192,6 +192,14 @@ func (s *SessionService) getSessionTickets(sessionID string) ([]models.Ticket, e
 		if err != nil {
 			return nil, err
 		}
+		
+		// Load votes for each ticket
+		votes, err := s.getTicketVotes(ticket.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get votes for ticket %d: %w", ticket.ID, err)
+		}
+		ticket.Votes = votes
+		
 		tickets = append(tickets, ticket)
 	}
 
