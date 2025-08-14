@@ -1,0 +1,209 @@
+/* Additional styles for the poker planning app */
+
+/* Custom animations */
+@keyframes pulse-soft {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+@keyframes bounce-in {
+    0% {
+        transform: scale(0.3);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    70% {
+        transform: scale(0.9);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes slide-in-up {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Voting cards enhanced styling */
+.voting-card {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(10px);
+    border: 2px solid transparent;
+}
+
+.voting-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    border-color: #3B82F6;
+}
+
+.voting-card.selected {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 15px 35px rgba(59, 130, 246, 0.3);
+    border-color: #3B82F6;
+    background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+    color: white;
+}
+
+.voting-card:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+/* Participant status indicators */
+.participant {
+    transition: all 0.2s ease;
+}
+
+.participant:hover {
+    transform: translateX(4px);
+    background-color: #F3F4F6;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-online {
+    background-color: #10B981;
+    animation: pulse-soft 2s infinite;
+}
+
+.status-voting {
+    background-color: #F59E0B;
+    animation: pulse-soft 1s infinite;
+}
+
+.status-voted {
+    background-color: #3B82F6;
+}
+
+/* Results visualization */
+.vote-bar {
+    transition: width 0.6s ease-in-out;
+}
+
+.vote-histogram {
+    animation: slide-in-up 0.5s ease-out;
+}
+
+/* Modal improvements */
+.modal-backdrop {
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    animation: bounce-in 0.3s ease-out;
+}
+
+/* SSE connection status */
+.connection-status {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1000;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    transition: all 0.3s ease;
+}
+
+.connection-status.connected {
+    background-color: #10B981;
+    color: white;
+}
+
+.connection-status.disconnected {
+    background-color: #EF4444;
+    color: white;
+    animation: pulse-soft 1s infinite;
+}
+
+/* Ticket cards */
+.ticket-card {
+    transition: all 0.2s ease;
+}
+
+.ticket-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.ticket-card.current {
+    border-color: #3B82F6;
+    background: linear-gradient(135deg, #EBF4FF 0%, #DBEAFE 100%);
+}
+
+/* Loading states */
+.loading-skeleton {
+    background: linear-gradient(90deg, #F3F4F6 25%, #E5E7EB 50%, #F3F4F6 75%);
+    background-size: 200% 100%;
+    animation: loading-shimmer 1.5s infinite;
+}
+
+@keyframes loading-shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .voting-cards-grid {
+        grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+        gap: 0.5rem;
+    }
+    
+    .participant-list {
+        flex-direction: row;
+        overflow-x: auto;
+        padding-bottom: 0.5rem;
+    }
+    
+    .participant {
+        min-width: 120px;
+        margin-right: 0.5rem;
+    }
+}
+
+/* Focus states for accessibility */
+.voting-card:focus,
+.btn:focus,
+input:focus,
+textarea:focus {
+    outline: 2px solid #3B82F6;
+    outline-offset: 2px;
+}
+
+/* Print styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    .voting-card {
+        border: 1px solid #000;
+        box-shadow: none;
+    }
+}

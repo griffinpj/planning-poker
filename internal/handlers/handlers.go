@@ -1,0 +1,402 @@
+package handlers
+
+import (
+	"html/template"
+	"net/http"
+
+	"poker-planning/internal/models"
+	"poker-planning/internal/services"
+	"poker-planning/internal/utils"
+
+	"github.com/go-chi/chi/v5"
+)
+
+type Handler struct {
+	userService    *services.UserService
+	sessionService *services.SessionService
+	votingService  *services.VotingService
+	ticketService  *services.TicketService
+	sseService     *services.SSEService
+	templates      *template.Template
+}
+
+func NewHandler(userService *services.UserService, sessionService *services.SessionService, votingService *services.VotingService, ticketService *services.TicketService, sseService *services.SSEService) *Handler {
+	templates := template.Must(template.ParseGlob("templates/*.html"))
+	
+	return &Handler{
+		userService:    userService,
+		sessionService: sessionService,
+		votingService:  votingService,
+		ticketService:  ticketService,
+		sseService:     sseService,
+		templates:      templates,
+	}
+}
+
+type PageData struct {
+	Title           string
+	Template        string
+	User            *models.User
+	Session         *models.Session
+	SessionName     string
+	VotingCards     []string
+	UserVote        *models.Vote
+	VoteHistogram   []VoteCount
+	CurrentTicketIndex int
+}
+
+type VoteCount struct {
+	Value      string
+	Count      int
+	Percentage int
+}
+
+func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
+	user := GetUserFromContext(r.Context())
+	
+	data := PageData{
+		Title:    "Home",
+		Template: "home",
+		User:     user,
+	}
+	
+	h.executeTemplate(w, "base.html", data)
+}
+
+func (h *Handler) SetUsername(w http.ResponseWriter, r *http.Request) {
+	username := utils.SanitizeInput(r.FormValue("username"))
+	
+	if validationErrors := utils.ValidateUsername(username); validationErrors.HasErrors() {
+		utils.WriteHTMLError(w, http.StatusBadRequest, validationErrors.Error())
+		return
+	}
+
+	user, err := h.userService.CreateUser(username)
+	if err != nil {
+		utils.LogError("SetUsername", err)
+		utils.WriteHTMLError(w, http.StatusInternalServerError, "Failed to create user account")
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     SessionCookieName,
+		Value:    user.ID,
+		MaxAge:   6 * 3600, // 6 hours
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	// Check if there's a redirect_to parameter or referer
+	redirectTo := r.FormValue("redirect_to")
+	if redirectTo == "" {
+		referer := r.Header.Get("Referer")
+		if referer != "" && referer != r.Header.Get("Host") {
+			redirectTo = referer
+		}
+	}
+	
+	if redirectTo != "" && redirectTo != "/" {
+		w.Header().Set("HX-Redirect", redirectTo)
+	} else {
+		w.Header().Set("HX-Refresh", "true")
+	}
+}
+
+func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
+	user := GetUserFromContext(r.Context())
+	if user == nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	name := utils.SanitizeInput(r.FormValue("name"))
+	
+	if validationErrors := utils.ValidateSessionName(name); validationErrors.HasErrors() {
+		utils.WriteHTMLError(w, http.StatusBadRequest, validationErrors.Error())
+		return
+	}
+
+	session, err := h.sessionService.CreateSession(name, user.ID)
+	if err != nil {
+		utils.LogError("CreateSession", err)
+		utils.WriteHTMLError(w, http.StatusInternalServerError, "Failed to create planning session")
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/session/"+session.ID)
+}
+
+func (h *Handler) GetSessionPartial(w http.ResponseWriter, r *http.Request) {
+	user := GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	sessionID := chi.URLParam(r, "sessionID")
+	session, err := h.sessionService.GetSessionByID(sessionID)
+	if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+	if session == nil {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if user is a participant
+	isParticipant := false
+	for _, participant := range session.Participants {
+		if participant.ID == user.ID {
+			isParticipant = true
+			break
+		}
+	}
+
+	if !isParticipant {
+		http.Error(w, "Not a session participant", http.StatusForbidden)
+		return
+	}
+
+	var userVote *models.Vote
+	var voteHistogram []VoteCount
+	var currentTicketIndex int
+
+	if session.CurrentTicket != nil {
+		for i, ticket := range session.Tickets {
+			if ticket.ID == session.CurrentTicket.ID {
+				currentTicketIndex = i + 1
+				break
+			}
+		}
+
+		for _, vote := range session.CurrentTicket.Votes {
+			if vote.UserID == user.ID {
+				userVote = &vote
+				break
+			}
+		}
+
+		if !session.IsVotingActive {
+			voteHistogram = h.calculateVoteHistogram(session.CurrentTicket.Votes)
+		}
+	}
+
+	data := PageData{
+		Title:              session.Name,
+		Template:           "session",
+		User:               user,
+		Session:            session,
+		SessionName:        session.Name,
+		VotingCards:        models.AllVotingCards(),
+		UserVote:           userVote,
+		VoteHistogram:      voteHistogram,
+		CurrentTicketIndex: currentTicketIndex,
+	}
+
+	// Return only the session content, not the full page
+	h.executeTemplate(w, "session-content", data)
+}
+
+func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
+	user := GetUserFromContext(r.Context())
+	if user == nil {
+		// Redirect to home page with redirect_to parameter
+		redirectURL := "/?redirect_to=" + r.URL.Path
+		http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+		return
+	}
+
+	sessionID := chi.URLParam(r, "sessionID")
+	session, err := h.sessionService.GetSessionByID(sessionID)
+	if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+	if session == nil {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	}
+
+	userJoined, err := h.sessionService.JoinSession(sessionID, user.ID)
+	if err != nil {
+		http.Error(w, "Failed to join session", http.StatusInternalServerError)
+		return
+	}
+
+	// Only broadcast if user actually joined (wasn't already a participant)
+	if userJoined {
+		h.sseService.Broadcast(sessionID, models.SSEMessage{
+			Type: "user-joined",
+			Data: user,
+		})
+	}
+
+	session, err = h.sessionService.GetSessionByID(sessionID)
+	if err != nil {
+		http.Error(w, "Failed to refresh session", http.StatusInternalServerError)
+		return
+	}
+
+	var userVote *models.Vote
+	var voteHistogram []VoteCount
+	var currentTicketIndex int
+
+	if session.CurrentTicket != nil {
+		for i, ticket := range session.Tickets {
+			if ticket.ID == session.CurrentTicket.ID {
+				currentTicketIndex = i + 1
+				break
+			}
+		}
+
+		for _, vote := range session.CurrentTicket.Votes {
+			if vote.UserID == user.ID {
+				userVote = &vote
+				break
+			}
+		}
+
+		if !session.IsVotingActive {
+			voteHistogram = h.calculateVoteHistogram(session.CurrentTicket.Votes)
+		}
+	}
+
+	data := PageData{
+		Title:              session.Name,
+		Template:           "session",
+		User:               user,
+		Session:            session,
+		SessionName:        session.Name,
+		VotingCards:        models.AllVotingCards(),
+		UserVote:           userVote,
+		VoteHistogram:      voteHistogram,
+		CurrentTicketIndex: currentTicketIndex,
+	}
+
+	h.executeTemplate(w, "base.html", data)
+}
+
+func (h *Handler) JoinSession(w http.ResponseWriter, r *http.Request) {
+	user := GetUserFromContext(r.Context())
+	if user == nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	sessionID := chi.URLParam(r, "sessionID")
+	
+	userJoined, err := h.sessionService.JoinSession(sessionID, user.ID)
+	if err != nil {
+		http.Error(w, "Failed to join session", http.StatusInternalServerError)
+		return
+	}
+
+	// Only broadcast if user actually joined (wasn't already a participant)
+	if userJoined {
+		h.sseService.Broadcast(sessionID, models.SSEMessage{
+			Type: "user-joined",
+			Data: user,
+		})
+	}
+
+	http.Redirect(w, r, "/session/"+sessionID, http.StatusSeeOther)
+}
+
+func (h *Handler) LeaveSession(w http.ResponseWriter, r *http.Request) {
+	user := GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	sessionID := chi.URLParam(r, "sessionID")
+	
+	err := h.sessionService.LeaveSession(sessionID, user.ID)
+	if err != nil {
+		http.Error(w, "Failed to leave session", http.StatusInternalServerError)
+		return
+	}
+
+	h.sseService.Broadcast(sessionID, models.SSEMessage{
+		Type: "user-left",
+		Data: user,
+	})
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) DeleteSession(w http.ResponseWriter, r *http.Request) {
+	user := GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	sessionID := chi.URLParam(r, "sessionID")
+	session, err := h.sessionService.GetSessionByID(sessionID)
+	if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+	if session == nil {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	}
+
+	// Only the session owner can delete the session
+	if session.OwnerID != user.ID {
+		http.Error(w, "Only session owner can delete the session", http.StatusForbidden)
+		return
+	}
+
+	// Broadcast session end to all participants before deletion
+	h.sseService.Broadcast(sessionID, models.SSEMessage{
+		Type: "session-ended",
+		Data: map[string]interface{}{
+			"message": "Session has been ended by the owner",
+		},
+	})
+
+	err = h.sessionService.DeleteSession(sessionID)
+	if err != nil {
+		http.Error(w, "Failed to delete session", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) calculateVoteHistogram(votes []models.Vote) []VoteCount {
+	voteCounts := make(map[string]int)
+	total := len(votes)
+
+	for _, vote := range votes {
+		voteCounts[vote.VoteValue]++
+	}
+
+	var histogram []VoteCount
+	for _, card := range models.AllVotingCards() {
+		count := voteCounts[card]
+		percentage := 0
+		if total > 0 {
+			percentage = (count * 100) / total
+		}
+		
+		histogram = append(histogram, VoteCount{
+			Value:      card,
+			Count:      count,
+			Percentage: percentage,
+		})
+	}
+
+	return histogram
+}
+
+func (h *Handler) executeTemplate(w http.ResponseWriter, tmplName string, data interface{}) {
+	err := h.templates.ExecuteTemplate(w, tmplName, data)
+	if err != nil {
+		http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
+	}
+}

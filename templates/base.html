@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - Sprint Planning Poker</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="/static/css/app.css" rel="stylesheet">
+    <style>
+        .card {
+            transition: all 0.2s ease;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        .card.selected {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 30px rgba(59, 130, 246, 0.4);
+        }
+        .emoji-reaction {
+            position: fixed;
+            pointer-events: none;
+            z-index: 1000;
+            font-size: 24px;
+        }
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .animate-fade-in-up {
+            animation: fadeInUp 0.3s ease-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-4">
+                    <a href="/" class="text-2xl font-bold text-blue-600 hover:text-blue-700 transition-colors">Sprint Planning Poker</a>
+                    {{if .SessionName}}
+                    <span class="text-gray-600">•</span>
+                    <span class="text-lg font-medium text-gray-800">{{.SessionName}}</span>
+                    {{end}}
+                </div>
+                {{if .User}}
+                <div class="flex items-center space-x-4">
+                    {{if .Session}}
+                    <!-- Session Navigation -->
+                    <button 
+                        onclick="copySessionUrl(event)" 
+                        class="flex items-center space-x-1 px-3 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+                        title="Copy session URL to share"
+                    >
+                        <span class="material-icons text-sm">share</span>
+                        <span>Share</span>
+                    </button>
+                    {{if eq .User.ID .Session.OwnerID}}
+                    <button 
+                        onclick="showEndSessionModal()" 
+                        class="flex items-center space-x-1 px-3 py-1 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+                        title="End session for everyone"
+                    >
+                        <span class="material-icons text-sm">stop</span>
+                        <span>End Session</span>
+                    </button>
+                    {{else}}
+                    <button 
+                        onclick="showLeaveSessionModal()" 
+                        class="flex items-center space-x-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
+                        title="Leave session"
+                    >
+                        <span class="material-icons text-sm">exit_to_app</span>
+                        <span>Leave</span>
+                    </button>
+                    {{end}}
+                    <span class="text-gray-300">|</span>
+                    {{end}}
+                    <span class="text-sm text-gray-600">Welcome, 
+                        <button 
+                            onclick="showEditUsernameModal()" 
+                            class="text-blue-600 hover:text-blue-700 hover:underline font-medium"
+                            title="Click to change your nickname"
+                        >{{.User.Username}}</button>
+                    </span>
+                </div>
+                {{end}}
+            </div>
+        </div>
+    </header>
+
+    <main id="main-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {{if eq .Template "home"}}{{template "home-content" .}}{{end}}
+        {{if eq .Template "session"}}{{template "session-content" .}}{{end}}
+    </main>
+
+    <script src="/static/js/app.js"></script>
+    <script>
+    function copySessionUrl(event) {
+        const url = window.location.href;
+        navigator.clipboard.writeText(url).then(function() {
+            // Show a brief success message
+            const button = event.target.closest('button');
+            const originalText = button.innerHTML;
+            button.innerHTML = '<span class="material-icons text-sm">check</span><span>Copied!</span>';
+            setTimeout(function() {
+                button.innerHTML = originalText;
+            }, 2000);
+        }).catch(function(err) {
+            console.error('Failed to copy URL: ', err);
+            alert('Failed to copy URL. Please copy manually: ' + url);
+        });
+    }
+    </script>
+</body>
+</html>
