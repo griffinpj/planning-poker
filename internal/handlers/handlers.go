@@ -44,6 +44,17 @@ type PageData struct {
 	VoteHistogram   []VoteCount
 	CurrentTicketIndex int
 	TicketAverages  map[int]float64 // ticket ID -> average
+	// Summary page data
+	TotalVotes       int
+	EstimatedTickets int
+	OverallAverage   float64
+	TicketVoteGroups map[int][]VoteCount // ticket ID -> vote groups
+	ParticipantStats map[string]*ParticipantStat // user ID -> stats
+}
+
+type ParticipantStat struct {
+	VoteCount   int
+	AverageVote float64
 }
 
 type VoteCount struct {
@@ -474,6 +485,142 @@ func parseVoteValue(voteValue string) int {
 	default:
 		return -1 // Invalid/special vote
 	}
+}
+
+func (h *Handler) ReviewSession(w http.ResponseWriter, r *http.Request) {
+	user := GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	sessionID := chi.URLParam(r, "sessionID")
+	session, err := h.sessionService.GetSessionByID(sessionID)
+	if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+	if session == nil {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	}
+
+	// Only the session owner can start a review
+	if session.OwnerID != user.ID {
+		http.Error(w, "Only session owner can start review", http.StatusForbidden)
+		return
+	}
+
+	// End the session by broadcasting session-ended and marking it for review
+	h.wsService.Broadcast(sessionID, models.SSEMessage{
+		Type: "session-ended",
+		Data: map[string]interface{}{
+			"message": "Session review started by the owner",
+			"redirect": "/session/" + sessionID + "/summary",
+		},
+	})
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) GetSessionSummary(w http.ResponseWriter, r *http.Request) {
+	user := GetUserFromContext(r.Context())
+	if user == nil {
+		// Redirect to home page
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	sessionID := chi.URLParam(r, "sessionID")
+	session, err := h.sessionService.GetSessionByID(sessionID)
+	if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+	if session == nil {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if user was a participant
+	isParticipant := false
+	for _, participant := range session.Participants {
+		if participant.ID == user.ID {
+			isParticipant = true
+			break
+		}
+	}
+
+	if !isParticipant {
+		http.Error(w, "Not a session participant", http.StatusForbidden)
+		return
+	}
+
+	// Calculate summary statistics
+	totalVotes := 0
+	estimatedTickets := 0
+	var allVotes []models.Vote
+	ticketAverages := make(map[int]float64)
+	ticketVoteGroups := make(map[int][]VoteCount)
+
+	for _, ticket := range session.Tickets {
+		if len(ticket.Votes) > 0 {
+			totalVotes += len(ticket.Votes)
+			allVotes = append(allVotes, ticket.Votes...)
+			
+			if avg := h.calculateVoteAverage(ticket.Votes); avg != nil {
+				ticketAverages[ticket.ID] = *avg
+				estimatedTickets++
+			}
+			
+			ticketVoteGroups[ticket.ID] = h.calculateVoteHistogram(ticket.Votes)
+		}
+	}
+
+	// Calculate overall average
+	var overallAverage float64
+	if overallAvg := h.calculateVoteAverage(allVotes); overallAvg != nil {
+		overallAverage = *overallAvg
+	}
+
+	// Calculate participant statistics
+	participantStats := make(map[string]*ParticipantStat)
+	for _, participant := range session.Participants {
+		var participantVotes []models.Vote
+		for _, ticket := range session.Tickets {
+			for _, vote := range ticket.Votes {
+				if vote.UserID == participant.ID {
+					participantVotes = append(participantVotes, vote)
+				}
+			}
+		}
+		
+		stat := &ParticipantStat{
+			VoteCount: len(participantVotes),
+		}
+		
+		if avg := h.calculateVoteAverage(participantVotes); avg != nil {
+			stat.AverageVote = *avg
+		}
+		
+		participantStats[participant.ID] = stat
+	}
+
+	data := PageData{
+		Title:            session.Name + " - Summary",
+		Template:         "summary",
+		User:             user,
+		Session:          session,
+		SessionName:      session.Name,
+		TicketAverages:   ticketAverages,
+		TotalVotes:       totalVotes,
+		EstimatedTickets: estimatedTickets,
+		OverallAverage:   overallAverage,
+		TicketVoteGroups: ticketVoteGroups,
+		ParticipantStats: participantStats,
+	}
+
+	h.executeTemplate(w, "base.html", data)
 }
 
 func (h *Handler) executeTemplate(w http.ResponseWriter, tmplName string, data interface{}) {

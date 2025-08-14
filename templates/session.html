@@ -291,6 +291,15 @@
                         <span class="material-icons text-sm mr-1">skip_next</span>
                         Next Ticket
                     </button>
+
+                    <!-- Review Session -->
+                    <button 
+                        class="btn bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700"
+                        onclick="showReviewModal()"
+                    >
+                        <span class="material-icons text-sm mr-1">summarize</span>
+                        Review
+                    </button>
                     {{end}}
                 </div>
             </div>
@@ -549,6 +558,26 @@ function nextTicket() {
     }).then(response => {
         if (response.ok) {
             window.location.reload();
+        }
+    });
+}
+
+function showReviewModal() {
+    const modal = document.getElementById('review-modal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function hideReviewModal() {
+    const modal = document.getElementById('review-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function startReview() {
+    fetch('/session/' + window.sessionId + '/review', {
+        method: 'POST'
+    }).then(response => {
+        if (response.ok) {
+            window.location.href = '/session/' + window.sessionId + '/summary';
         }
     });
 }

@@ -73,6 +73,8 @@ func main() {
 		r.Get("/{sessionID}/ws", h.WebSocketHandler)
 		r.Post("/{sessionID}/leave", h.LeaveSession)
 		r.Delete("/{sessionID}", h.DeleteSession)
+		r.Post("/{sessionID}/review", h.ReviewSession)
+		r.Get("/{sessionID}/summary", h.GetSessionSummary)
 	})
 
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("static/"))))

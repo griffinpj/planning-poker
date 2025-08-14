@@ -159,10 +159,11 @@
     <main id="main-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {{if eq .Template "home"}}{{template "home-content" .}}{{end}}
         {{if eq .Template "session"}}{{template "session-content" .}}{{end}}
+        {{if eq .Template "summary"}}{{template "summary-content" .}}{{end}}
     </main>
 
-    <!-- Session Modals (only for session pages) -->
-    {{if eq .Template "session"}}{{template "session-modals" .}}{{end}}
+    <!-- Session Modals (for session and summary pages) -->
+    {{if or (eq .Template "session") (eq .Template "summary")}}{{template "session-modals" .}}{{end}}
 
     <script src="/static/js/app.js"></script>
     <script>
@@ -180,6 +181,49 @@
             console.error('Failed to copy URL: ', err);
             alert('Failed to copy URL. Please copy manually: ' + url);
         });
+    }
+
+    // Check if we're on summary page for different modal behavior
+    function isSummaryPage() {
+        return window.location.pathname.includes('/summary');
+    }
+
+    function showEndSessionModal() {
+        const modal = document.getElementById('end-session-modal');
+        if (modal) {
+            // Update modal text for summary page
+            if (isSummaryPage()) {
+                const messageElement = modal.querySelector('p');
+                if (messageElement) {
+                    messageElement.textContent = 'This will permanently delete the session data and redirect all users to the home page.';
+                }
+            }
+            modal.classList.remove('hidden');
+        }
+    }
+
+    function showLeaveSessionModal() {
+        const modal = document.getElementById('leave-session-modal');
+        if (modal) {
+            // Update modal text for summary page
+            if (isSummaryPage()) {
+                const messageElement = modal.querySelector('p');
+                if (messageElement) {
+                    messageElement.textContent = 'You will be redirected to the home page.';
+                }
+            }
+            modal.classList.remove('hidden');
+        }
+    }
+
+    function hideEndSessionModal() {
+        const modal = document.getElementById('end-session-modal');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    function hideLeaveSessionModal() {
+        const modal = document.getElementById('leave-session-modal');
+        if (modal) modal.classList.add('hidden');
     }
 
     // WebSocket connection for session pages
@@ -271,8 +315,15 @@
                         });
                         break;
                     case 'session-ended':
-                        alert('This session has been ended by the owner.');
-                        window.location.href = '/';
+                        const sessionEndData = message.data;
+                        if (sessionEndData && sessionEndData.redirect) {
+                            // Review mode - redirect to summary
+                            window.location.href = sessionEndData.redirect;
+                        } else {
+                            // Normal end - redirect to home
+                            alert('This session has been ended by the owner.');
+                            window.location.href = '/';
+                        }
                         break;
                     case 'connected':
                         console.log('WebSocket connection confirmed');
