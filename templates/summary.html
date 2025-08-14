@@ -34,8 +34,10 @@
                 <div class="text-gray-600">Tickets Estimated</div>
             </div>
             <div class="bg-white rounded-lg shadow-md p-6 text-center">
-                <div class="text-3xl font-bold text-purple-600 mb-2">{{printf "%.1f" .OverallAverage}}</div>
-                <div class="text-gray-600">Overall Average</div>
+                <div class="text-3xl font-bold text-purple-600 copyable-value mb-2" 
+                     onclick="copyAverageValue(event, '{{printf "%.1f" .OverallAverage}}')"
+                     title="Click to copy overall average">{{printf "%.1f" .OverallAverage}}</div>
+                <div class="text-gray-600">Overall Average (click to copy)</div>
             </div>
         </div>
 
@@ -61,8 +63,10 @@
                             <div class="text-2xl font-bold text-green-600">{{.FinalEstimate}}</div>
                             <div class="text-xs text-gray-500">Final Estimate</div>
                             {{else if $ticketAvg}}
-                            <div class="text-2xl font-bold text-purple-600">{{printf "%.1f" $ticketAvg}}</div>
-                            <div class="text-xs text-gray-500">Average Vote</div>
+                            <div class="text-2xl font-bold text-purple-600 copyable-value" 
+                                 onclick="copyAverageValue(event, '{{printf "%.1f" $ticketAvg}}')"
+                                 title="Click to copy average value">{{printf "%.1f" $ticketAvg}}</div>
+                            <div class="text-xs text-gray-500">Average Vote (click to copy)</div>
                             {{else}}
                             <div class="text-gray-400">No votes</div>
                             {{end}}
@@ -103,7 +107,9 @@
                         {{if $ticketAvg}}
                         <div class="mt-2 text-sm">
                             <span class="font-medium text-gray-700">Average: </span>
-                            <span class="font-bold text-purple-600">{{printf "%.1f" $ticketAvg}}</span>
+                            <span class="font-bold text-purple-600 copyable-value" 
+                                  onclick="copyAverageValue(event, '{{printf "%.1f" $ticketAvg}}')"
+                                  title="Click to copy average value">{{printf "%.1f" $ticketAvg}}</span>
                         </div>
                         {{end}}
                     </div>
@@ -146,12 +152,14 @@
                         <div class="text-center">
                             <div class="font-bold text-green-600">
                                 {{if and $participantStats (gt $participantStats.VoteCount 0)}}
-                                {{printf "%.1f" $participantStats.AverageVote}}
+                                <span class="copyable-value" 
+                                      onclick="copyAverageValue(event, '{{printf "%.1f" $participantStats.AverageVote}}')"
+                                      title="Click to copy participant average">{{printf "%.1f" $participantStats.AverageVote}}</span>
                                 {{else}}
                                 -
                                 {{end}}
                             </div>
-                            <div class="text-gray-600 text-xs">Avg Vote</div>
+                            <div class="text-gray-600 text-xs">Avg Vote{{if and $participantStats (gt $participantStats.VoteCount 0)}} (click to copy){{end}}</div>
                         </div>
                     </div>
                 </div>
@@ -193,5 +201,38 @@
         box-shadow: none !important;
     }
 }
+
+.copyable-value {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.copyable-value:hover {
+    opacity: 0.8;
+    transform: scale(1.05);
+}
 </style>
+
+<script>
+function copyAverageValue(event, value) {
+    navigator.clipboard.writeText(value).then(function() {
+        // Show a brief success message
+        const element = event.target;
+        const originalText = element.innerHTML;
+        const originalColor = element.className;
+        
+        // Change to show copied state
+        element.innerHTML = 'Copied!';
+        element.className = originalColor.replace('text-purple-600', 'text-green-600');
+        
+        setTimeout(function() {
+            element.innerHTML = originalText;
+            element.className = originalColor;
+        }, 1500);
+    }).catch(function(err) {
+        console.error('Failed to copy value: ', err);
+        alert('Failed to copy value. Value: ' + value);
+    });
+}
+</script>
 {{end}}
